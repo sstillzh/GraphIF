@@ -1,0 +1,96 @@
+As an intelligent assistant, your primary objective is to check whether the currently recognized New_topic action is correct in a multi-turn dialogue scenario.
+<system>
+OBJECTIVE:
+Our idea is to use a directed relationship graph to model the relationship between different rounds of dialogue.We need to gradually extract the relationship between the current conversation and different historical conversations, one relationship at a time, step by step. Previously, we have obtained the user intention based on the instruction. Now our task is to check whether the currently recognized New_topic action is correct in a multi-turn dialogue scenario.
+
+List of Actions that can be Selected：
+1. **Recollection**: This indicates that the user instruction serves as a *global constraint*, explicitly applying specific requirements to all subsequent interactions. It must clearly state the conditions that every future response must satisfy. If the constraint applies only to the current response, it is **not** considered a Recollection.
+
+2. **Identify_Context-Anchored**: *Context-Anchored* means that the user's instruction is based on content from earlier parts of the conversation. Therefore, the relevant contextual reference must be identified first in order to understand and respond appropriately.
+
+3. **Identify_Modify**: *Modify* refers to user instructions that further develop, revise, refine, clarify, or follow up on previous content in a logical manner. It can also refer to new instructions that, while lacking an explicit contextual anchor, clearly build upon the prior conversation. In such cases, the instruction is inherently a continuation or extension of the dialogue, and thus qualifies as a Modify relationship. To respond accurately, the system must identify the part of the previous dialogue that aligns with this Modify relationship. Modify represents a more advanced form of Context-Anchored, with the key distinction being that it introduces additional or more specific requirements.
+
+4. **New_Topic**:This indicates that the user instruction introduces an entirely new subject that is *not* logically or contextually connected to the prior conversation. The instruction should be interpreted and responded to independently, as the beginning of a new conversational thread.( Be careful when judging New_Topic: only when the user instruction has nothing to do with the historical conversations, it could be judged as New_Topic.)
+
+5. **Done**: This indicates that all necessary actions have been completed and all relevant information has been successfully extracted or identified (or when answering user instructions, there is no need to extract specific historical information, and the response can be generated directly). The system has finished any required analysis, interpretation, or contextual linking related to the user's instruction. At this point, no further internal processing is needed, and the system is ready to proceed with generating a final response. The *Done* status serves as a clear signal that the input has been fully understood and the conversation can now transition to output generation.
+
+Attention：
+Large language models may produce hallucinations and mistakenly identify instruction that does not open new topics as New_Topic. Analyze the following input. Are you sure that the current user instruction has no semantic connection with the historical conversation and has transferred or opened a new topic? If you are sure, return yes. Otherwise, return no.
+
+
+OUTPUT FORMAT：
+You will respond with a JSON object in this format and will not respond to anything else:
+{
+"rationale": "<Explain the reasons for choosing the corresponding answer.>",
+"answer": <the chosen yes/no>
+}
+
+Remember：
+1.Be careful when using New_Topic. Only when the instruction is a single instruction and has no any connection with the historical dialogue, use New_Topic.
+
+# Demonstration Examples
+
+Example 1 --- A example that was misjudged as New_Topic: 
+##### 
+instruction: 
+For each of these locations, I want you to provide a description for them. Your answer should be formatted as '{location}: {description}.
+
+Intention: 
+{
+"Intention": "Provide a description for each location listed in the instruction",
+"Constraints": "The answer should be formatted as '{location}: {description}.'"
+}
+
+History_info：
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"This instruction will be followed. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.\"\n}\nRound2:{\n  \"Instruction\": \"The user asked to discuss the ethical and logistical concerns of implementing the 'Cure-All' Nanobot in healthcare.\",\n  \"Response\": \"Affordability and accessibility issues may limit access to the nanobot, exacerbating healthcare inequalities. Reliance on such technology could overshadow traditional medical practices and raise privacy and data security concerns. Unknown long-term effects on human health and evolution are also a concern. Is there anything else I can help you with?\"\n}\nRound3:{\n  \"Instruction\": \"The user asked to analyze the potential ethical, logistical, and cultural impacts of the 'Cure-All' Nanobot.\",\n  \"Response\": \"The 'Cure-All' Nanobot, though revolutionary, faces ethical concerns regarding affordability and accessibility, which could widen healthcare disparities. Logistical challenges include infrastructure and training needs. Overreliance on this technology might diminish traditional medical practices, impacting healthcare diversity.\"\n}
+(The content in the middle is not relevant to the question and has been omitted)
+Round10:{\n  \"Instruction\": \"The user asked to list all the locations in the initial content previously provided.\",\n  \"Response\": \"Helios Medical Center, sky city of Stratonimbus, floating gardens of Stratonimbus, annual Global Health Symposium\"\n}\nRound11:{\n  \"Instruction\": \"The user asked to list items related to 'Cure-All' Nanobot.\",\n  \"Response\": \"Sky city of Stratonimbus, Helios Medical Center, floating gardens of Stratonimbus.
+
+
+Assistant:
+{
+"rationale": "The instruction to 'provide a description for each location listed' is not an independent new topic. It clearly builds upon previous instructions and responses, specifically those where the user asked to list locations related to the 'Cure-All' Nanobot (Round10 and Round11). The listed locations were extracted from the context of the nanobot discussion, and now the user wants to elaborate on them. This demonstrates a logical continuation of the same topic rather than a shift to a new one.",
+"answer": "no"
+}
+#####
+
+
+Example 2 --- A example that is actually New_Topic: 
+##### 
+instruction: 
+Write a persuasive email to convince your introverted friend, who dislikes public speaking, to volunteer as a guest speaker at a local event. Use compelling arguments and address potential objections. Please be concise.
+
+Intention: 
+{
+"Intention": "Compose a persuasive email to encourage an introverted friend who dislikes public speaking to volunteer as a guest speaker at a local event, addressing potential objections and providing compelling arguments while keeping the email concise",
+"Constraints": "The email should be persuasive, address objections, and maintain a concise length"
+}
+
+History_info：
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"This instruction will be followed. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.\"\n}\nRound2:{\n  \"Instruction\": \"The user asked to discuss the ethical and logistical concerns of implementing the 'Cure-All' Nanobot in healthcare.\",\n  \"Response\": \"Affordability and accessibility issues may limit access to the nanobot, exacerbating healthcare inequalities. Reliance on such technology could overshadow traditional medical practices and raise privacy and data security concerns. Unknown long-term effects on human health and evolution are also a concern. Is there anything else I can help you with?\"\n}\nRound3:{\n  \"Instruction\": \"The user asked to analyze the potential ethical, logistical, and cultural impacts of the 'Cure-All' Nanobot.\",\n  \"Response\": \"The 'Cure-All' Nanobot, though revolutionary, faces ethical concerns regarding affordability and accessibility, which could widen healthcare disparities. Logistical challenges include infrastructure and training needs. Overreliance on this technology might diminish traditional medical practices, impacting healthcare diversity.\"\n}\nRound4:{\n  \"Instruction\": \"The user asked to include an analogy to illustrate the ethical or logistical issue related to the 'Cure-All' Nanobot.\",\n  \"Response\": \"Like a high-tech lock needing a unique key, the 'Cure-All' Nanobot's personalized approach raises concerns of accessibility and affordability. This could create a 'digital divide' in healthcare, where only the wealthy have keys to this advanced treatment, exacerbating existing disparities. Additionally, the logistical complexity of implementing such technology mirrors setting up a vast, intricate network of specialized locks, challenging existing healthcare infrastructures.\"\n}\nRound5:{\n  \"Instruction\": \"The user asked to craft a hypothetical scenario showcasing the concern of medical inequality due to the exclusive availability of advanced nanotechnology.\",\n  \"Response\": \"Imagine a future where 'Cure-All' Nanobots are exclusive and expensive, leading to a divide between those who can afford luxury healthcare and those who can't. This creates medical inequality, similar to setting up exclusive dealerships, straining healthcare systems. Is there anything else I can help you with?\"\n}\nRound6:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"Dr. Elara Mivon's team at Helios Medical Center in Stratonimbus developed the 'Cure-All' Nanobot, a microscopic robot designed to treat various diseases. Tailored through DNA scanning, these nanobots use AI to detect and neutralize illness-causing agents, promising minimal side effects. While a significant medical advancement, concerns remain about affordability and accessibility.\"\n}\nRound7:{\n  \"Instruction\": \"Summarize Dr. Elara Mivon's team's development of the 'Cure-All' Nanobot in 50 words or less.\",\n  \"Response\": \"Dr. Elara Mivon's team at Helios Medical Center developed the 'Cure-All' Nanobot, AI-powered medical nanotechnology tailored to individual DNA for treating various diseases. Unveiled at the Global Health Symposium, it raises hopes and ethical questions about future healthcare.\"\n}\nRound8:{\n  \"Instruction\": \"The user instructed to include a direct quote from Dr. Mivon in the summary.\",\n  \"Response\": \"At the Global Health Symposium, Dr. Elara Mivon introduced the 'Cure-All' Nanobot from Helios Medical Center. These AI-powered, DNA-tailored nanobots aim to treat various diseases, as Dr. Mivon stated, 'We aimed to create a universally accessible solution.' The technology brings hope but raises ethical debates about healthcare accessibility.\"\n}\nRound9:{\n  \"Instruction\": \"The user asked to rewrite the summary from a critic's viewpoint.\",\n  \"Response\": \"Critics scrutinize Dr. Elara Mivon's 'Cure-All' Nanobot, developed at Helios Medical Center, questioning its practical accessibility and affordability. While the nanobots offer promise in eradicating diseases through AI-enhanced, DNA-tailored treatments, concerns remain about their widespread adoption due to potential ethical implications. Is there anything else I can help you with?\"\n}\nRound10:{\n  \"Instruction\": \"The user asked to list all the locations in the initial content previously provided.\",\n  \"Response\": \"Helios Medical Center, sky city of Stratonimbus, floating gardens of Stratonimbus, annual Global Health Symposium\"\n}\nRound11:{\n  \"Instruction\": \"The user asked to list items related to 'Cure-All' Nanobot.\",\n  \"Response\": \"Sky city of Stratonimbus, Helios Medical Center, floating gardens of Stratonimbus.\"\n}\nRound12:{\n  \"Instruction\": \"The user requested descriptions for specific locations in the setting of Stratonimbus.\",\n  \"Response\": \"sky city of Stratonimbus: A futuristic and advanced urban environment, possibly elevated high above the ground or clouds. Helios Medical Center: A state-of-the-art medical facility equipped with cutting-edge technology for research and patient care, specializing in innovative treatments. Floating gardens of Stratonimbus: Unique and picturesque gardens suspended or floating within the sky city, used for relaxation, recreation, and events like the annual Global Health Symposium.\"\n}\nRound13:{\n  \"Instruction\": \"The user described key features of the futuristic sky city Stratonimbus.\",\n  \"Response\": \"Sky city Stratonimbus: Technological progress, Helios Medical Center, floating gardens for events.\"\n}\nRound14:{\n  \"Instruction\": \"The user asked to rewrite or paraphrase the third paragraph of the initial content, maintaining the original meaning with different wording.\",\n  \"Response\": \"Dr. Elara Mivon, a renowned expert in bioengineering and AI, showcased her groundbreaking work at the annual Global Health Symposium held among the floating gardens of Stratonimbus. Dr. Mivon stated, 'Our main goal has been to revolutionize healthcare. We aimed to create a widely available and highly effective solution. The 'Cure-All' Nanobot brings us closer to a time when diseases are no longer a concern.'\"\n}\nRound15:{\n  \"Instruction\": \"Condense the rewrite within 50 words.\",\n  \"Response\": \"Dr. Elara Mivon announced the 'Cure-All' Nanobot at the Global Health Symposium, promising a revolutionary leap in healthcare by potentially eliminating illnesses.\"\n}\nRound16:{\n  \"Instruction\": \"The user asked to include at least three technical terms related to bioengineering or AI in the response.\",\n  \"Response\": \"Bioengineer Dr. Elara Mivon, at the Global Health Symposium, introduced the 'Cure-All' Nanobot. This AI-driven innovation, employing biocompatible algorithms, is a milestone in nanomedicine, potentially rendering diseases obsolete. The 'Cure-All' Nanobot utilizes advanced computational models and nanotechnology to revolutionize medical treatments. Is there anything else I can help you with?\"\n}\nRound17:{\n  \"Instruction\": \"The user requested a rewrite where each sentence starts with 'H'.\",\n  \"Response\": \"Helios Medical Center's Dr. Elara Mivon heralded the 'Cure-All' Nanobot at the Health Symposium. Heralding a new healthcare era, her invention hints at halting illnesses globally. Is there anything else I can help you with?
+
+
+Assistant:
+{
+  "rationale": "The instruction is to 'Write a persuasive email to convince your introverted friend... to volunteer as a guest speaker at a local event.' This request is entirely unrelated to the ongoing conversation, which has consistently focused on the 'Cure-All' Nanobot, its development, implications, summaries, and contextual descriptions of related settings. There is no thematic, logical, or contextual link between the current instruction and any previous content. Thus, this instruction introduces a completely new conversational thread and should be classified as a New_Topic.",
+  "answer": "yes"
+}
+
+#####
+#####
+
+The above are just examples, the following are the user's instruction
+Let’s begin.
+
+Conversation History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+
+Assistant:
+

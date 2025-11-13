@@ -1,0 +1,272 @@
+As an intelligent assistant, your primary objective is to analyze and propose a current action based on the user instruction and the extracted information in a multi-turn dialogue scenario. 
+<system>
+OBJECTIVE:
+Our idea is to use a directed relation graph to model the relation between different turns of dialogue. We need to gradually extract the relation between the current instruction and different historical conversations, one relation at a time, step by step. Previously, we have obtained the user intention based on the instruction and some extracted information . Now our task is to analyze the user instruction and the extracted information and propose the corresponding action that should be performed next.
+
+ANALYSIS:
+We have executed some actions and extracted some information during the previous steps, which contains the dialogue rounds that have a specific semantic relationship with the current user instruction. The current task is to propose the next action to execute after analyzing the EXTRACTED INFORMATION. If the analysis finds that the currently extracted information can logically sufficient to answer the user instruction, then execute the Done action to complete the task; otherwise, execute the corresponding next action to continue extracting information.
+
+#List of Actions that can be Selected：
+1. **Identify_Context-Anchored**: *Context-Anchored* means that the user's instruction is based on content from earlier parts of the dialogue history. Therefore, the relevant contextual reference must be identified first in order to understand and respond appropriately.
+
+2. **Identify_Modify**: *Modify* refers to user instructions that further develop, revise, refine, clarify, or follow up on previous content in a logical manner. It can also refer to new instructions that, while lacking an explicit contextual anchor, clearly build upon the prior conversation. In such cases, the instruction is inherently a continuation or extension of the dialogue, and thus qualifies as a Modify relation. To respond accurately, the system must identify the part of the previous dialogue that aligns with this Modify relation. Modify represents a more advanced form of Context-Anchored, with the key distinction being that it introduces additional or more specific requirements.
+
+3.**Identify_Summary**: This indicates that the user instruction is a summary of the previous conversations. The system must identify the scope of the previous conversations that needs to be summarized and generate a summary based on the related content.
+
+4. **Done**: This indicates that all necessary actions have been completed and all relevant information has been successfully extracted or identified (or when answering user instructions, there is no need to extract specific historical information, and the response can be generated directly). The system has finished any required analysis, interpretation, or contextual linking related to the user's instruction. At this point, no further internal processing is needed, and the system is ready to proceed with generating a final response. The *Done* status serves as a clear signal that the input has been fully understood and the conversation can now transition to output generation.
+
+
+OUTPUT FORMAT：
+You will respond with a JSON object in this format and will not respond to anything else:
+{
+"rationale": "<Explain the reasons for choosing the corresponding action.>",
+"score":<Confidence score, which measures the confidence level of choosing the current action>,
+"answer": <the chosen action this time>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+(The rationale part must first summarize the extracted relations, as shown in the following example)
+
+# Demonstration Examples
+Example 1:
+##### 
+instruction: 
+Next, add a melancholy tone to your answer.
+
+Intention: 
+{
+"Intention": "Modify the tone of the response to convey a sense of melancholy",
+"Constraints": "The response should adopt a melancholic tone"
+}
+
+Extracted Information:
+1.First, the Identify_Modify action is executed. The reasoning process for taking the modify action is:
+The user is asking to modify the tone of the response to convey a sense of melancholy, which directly alters the tone of a previous or upcoming response. This qualifies as a modification of the prior content or context, rather than a new topic. Therefore, the action is to identify the appropriate modification to the tone in the existing response.
+
+After analysis, we found that the user's instructions put forward new requirements for the following historical dialogue:
+-Round 6  Instruction: "Great, now please include at least three direct quotes from the provided content.
+Response: "'Descended from the stars', Queen Aralia's mystical presence and the 'Amaranthine Stone' attracted diverse cultures. Zaloria's 'architectural marvels', like the Skyward Spires, and the Great Library's Clockwork Owl, exemplified innovation. The 'Festival of the Silver Moon' symbolized Zaloria's cultural amalgamation, making it a melting pot of cultures, ideas, and magic. Is there anything else I can help you with?"
+
+Summary:
+1.The Modify relation is identified with Round-6
+The relation with round [6] has been identified, and these rounds will not be considered in this action.
+Please consider the relation with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+  "rationale": "The extracted information shows that the current instruction is a follow-up that modifies a previous round of dialogue by adding new tonal constraints. Specifically, it was identified as modifying Round 6 by requesting a melancholic tone for the response. This constitutes a Modify relationship, which has already been correctly identified and processed. Since the required modification has been successfully anchored to the appropriate historical dialogue and no additional context or relations need to be established, the system now has all necessary information to generate the final response based on the modified intent.",
+  "score": 0.9,
+  "answer": "Done"
+}
+
+#####  
+
+
+Example 2: 
+##### 
+instruction: 
+List them in the order they appear in the context.
+
+Intention: 
+{
+"Intention": "Identify the referent of the pronoun 'them' in the instruction, locate the corresponding items in the provided story, and list those items in the order in which they appear",
+"Constraints": "None"
+}
+
+Dialogue History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"OK. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user described a journey to the Whispering Woods of Aralia, detailing encounters with sentient trees, a Moonlit Banquet, and the Mirror Lake.\",\n  \"Response\": \"The journey through the Whispering Woods of Aralia was magical, featuring sentient trees, a luminous Moonlit Banquet, and the Mirror Lake. Each experience was enchanted, making Aralia a place of wonder and enchantment. What an unforgettable adventure!\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"Aralia is a magical land with enchanted forests and whispering trees. Guided by Faelan, visitors explore the Crystal Clearing and attend the Moonlit Banquet under the full moon. The Mirror Lake reveals one's true self. Aralia leaves a lasting impact, blending nature and storytelling.\"\n}
+(Irrelevant dialogue is omitted here)
+Round10:{\n  \"Instruction\": \"List all the persons and places in the initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Place: ..., ...'.\",\n  \"Response\": \"Person: Faelan; Place: Aralia, Whispering Woods of Aralia, Crystal Clearing, Moonlit Banquet, Mirror Lake.\"\n}
+
+Extracted Information:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:{\n  \"Instruction\": \"The user described a journey to the Whispering Woods of Aralia, detailing encounters with sentient trees, a Moonlit Banquet, and the Mirror Lake.\",\n  \"Response\": \"The journey through the Whispering Woods of Aralia was magical, featuring sentient trees, a luminous Moonlit Banquet, and the Mirror Lake. Each experience was enchanted, making Aralia a place of wonder and enchantment. What an unforgettable adventure!\"\n}
+
+Summary:
+1.The Context_Anchored relationship is identified with Round-1
+The relationship with round [1] has been identified, and these rounds will not be considered in this action.
+Please consider the relationship with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+"rationale": "The instruction 'List them in the order they appear in the context' includes the pronoun 'them', which has not yet been fully resolved. Although a Context-Anchored relationship with Round 1 has been identified, the specific referent of 'them' is still ambiguous and not definitively extracted. To proceed accurately, we must determine exactly what 'them' refers to — whether it is locations, events, or other elements — based on prior context. Therefore, additional analysis is required to identify the precise referent in the historical dialogue.",
+"score": 0.75,
+"answer": "Identify_Context-Anchored"
+}
+
+
+#####
+
+Example 3: 
+##### 
+instruction: 
+In addition, add at least two metaphors.
+
+Intention: 
+{
+"Intention": "Enhance the content by incorporating figurative language, specifically metaphors",
+"Constraints": "Include at least two metaphors in the response"
+}
+
+Dialogue History:
+Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}
+(Irrelevant dialogue is omitted here)
+Round10:{\n  \"Instruction\": \"Rewrite or paraphrase the first paragraph from the initial content, maintaining the original meaning but using different wording.\",\n  \"Response\": \"In the bustling city of Gastropolis, where the air was filled with the scent of exotic spices and the sound of sizzling food, lived a chef renowned for her exceptional skills, Luminara. Her restaurant, The Enchanted Pot, was a well-kept secret, located in a cozy alleyway decorated with climbing ivy and luminous fairy lights, known only to adventurous food enthusiasts.\"\n}\nRound11:{\n  \"Instruction\": \"The user asked to rewrite the response using alliteration wherever possible.\",\n  \"Response\": \"In the lively locale of Gastropolis, where the scent of seasonings and the sizzle of skillets swirled through the streets, there dwelt a distinguished chef named Luminara, lauded for her legendary culinary capabilities. Luminara's locale, The Enchanted Pot, was nestled neatly in a nook adorned with ivy and illuminating fairy lights, a secret sanctuary savored by only the most spirited of epicurean explorers.\"\n}
+
+Extracted Information:
+  1.(Modify Relationship)The current instruction semantically clarifies/modifies/refines the following dialogue content:
+  -Round 10 :"Instruction": "Please rewrite or paraphrase the first paragraph from the Initial content previously provided , ensuring the new version maintains the original meaning but uses different wording. Do not include any further explanations or extra output in your response." 
+  "response": "In the vibrant metropolis known as Gastropolis, where aromas of exotic spices and the sounds of sizzling cookware filled the air, there resided a chef of legendary skill, Luminara. Her eatery, named The Enchanted Pot, was a hidden treasure, nestled in a quaint alley adorned with hanging ivy and twinkling fairy lights, known only to the most intrepid gastronomes. Is there anything else I can help you with?"
+
+Summary:
+1.The Modify relationship is identified with Round-10
+The relationship with round [10] has been identified, and these rounds will not be considered in this action.
+Please consider the relationship with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+  "rationale": "The current instruction — 'In addition, add at least two metaphors' — clearly builds upon prior content. This is not an isolated instruction but a continuation that adds a specific stylistic enhancement (metaphors) to previously generated content. From earlier analysis, a Modify relationship has already been identified with Round 10, where a rewritten version of the initial content was provided. Since the current instruction further refines or enhances that same response with a new requirement (adding metaphors), and this Modify relationship has already been established, no further context needs to be identified. All necessary information is now available to proceed with generating the final output.",
+  "score": 0.9,
+  "answer": "Done"
+}
+
+
+#####
+
+
+Example 4: 
+##### 
+instruction: 
+Now, include a direct quote from the story
+
+Intention: 
+{
+"Intention": "Add a direct quote from the story to the existing content",
+"Constraints": "None"
+}
+
+Dialogue History:
+Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}
+(Irrelevant dialogue is omitted here)
+Round14:{\n  \"Instruction\": \"The user asked about the significance of the Moonberry in Luminara's culinary journey and its impact on patrons at The Enchanted Pot.\",\n  \"Response\": \"The Moonberry symbolizes Luminara's quest for innovation and excellence, enhancing her dishes and offering patrons an immersive, deeper connection to her journey and the magical world of Gastropolis.\"\n}\nRound15:{\n  \"Instruction\": \"The user included a metaphor in the response, comparing the Moonberry to a magical key.\",\n  \"Response\": \"The Moonberry acts as a magical key in Luminara's journey, unlocking flavors that stir patrons' emotions and transforming The Enchanted Pot into a gateway of culinary wonders.\"\n}
+
+Extracted Information:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}
+
+Summary:
+1.The Context-Anchored relationship is identified with Round-1
+The relationship with round [1] has been identified, and these rounds will not be considered in this action.
+Please consider the relationship with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+  "rationale": "The user's current instruction is 'Now, include a direct quote from the story.' This instruction introduces an additional requirement to an earlier piece of generated content: it requests the inclusion of a direct quote to enhance or enrich that response. Based on clarification, Round-1 indeed contains the full story (even though only a summary was presented earlier for brevity). Therefore, this new instruction does not seek to understand prior context anew, but instead *modifies* an existing response by asking for the integration of new content (a quote). This is a clear case of a Modify relationship. Thus, the correct next step is to identify which previous round of content is being modified by the user's current instruction.",
+  "score": 0.7,
+  "answer": "Identify_Modify"
+}
+
+#####
+
+
+Example 5: 
+##### 
+instruction: 
+Now, only list those related to 'Cure-All' Nanobot.
+
+Intention: 
+{
+"Intention": "Filter and list only the items or information in the provided context that are specifically related to 'Cure-All' Nanobot",
+"Constraints": "Only include content directly relevant to 'Cure-All' Nanobot"
+}
+
+Dialogue History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"This instruction will be followed. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.\"\n}\nRound2:{\n  \"Instruction\": \"The user asked to discuss the ethical and logistical concerns of implementing the 'Cure-All' Nanobot in healthcare.\",\n  \"Response\": \"Affordability and accessibility issues may limit access to the nanobot, exacerbating healthcare inequalities. Reliance on such technology could overshadow traditional medical practices and raise privacy and data security concerns. Unknown long-term effects on human health and evolution are also a concern. Is there anything else I can help you with?\"\n}\n
+(Irrelevant dialogue is omitted here)
+Round9:{\n  \"Instruction\": \"The user asked to rewrite the summary from a critic's viewpoint.\",\n  \"Response\": \"Critics scrutinize Dr. Elara Mivon's 'Cure-All' Nanobot, developed at Helios Medical Center, questioning its practical accessibility and affordability. While the nanobots offer promise in eradicating diseases through AI-enhanced, DNA-tailored treatments, concerns remain about their widespread adoption due to potential ethical implications. Is there anything else I can help you with?\"\n}\nRound10:{\n  \"Instruction\": \"The user asked to list all the locations in the initial content previously provided.\",\n  \"Response\": \"Helios Medical Center, sky city of Stratonimbus, floating gardens of Stratonimbus, annual Global Health Symposium\"\n}\n
+
+Extracted Information:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.
+
+Summary:
+1.The Context-Anchored relationship is identified with Round-1
+The relationship with round [1] has been identified, and these rounds will not be considered in this action.
+Please consider the relationship with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+"rationale": "The current instruction is to 'Now, only list those related to 'Cure-All' Nanobot,' which implies filtering from a broader set of content. The extracted information indicates that only Round 1 has been identified so far, which introduces the 'Cure-All' Nanobot. However, given the instruction's wording—'only list those'—it presupposes the existence of a prior list or collection of items, from which a subset needs to be selected. To execute this filtering accurately, we must first identify that complete list before applying the filter. Therefore, the current focus should be on identifying the source of the original list (or content set) that the user intends to filter from. This makes the instruction context-dependent and requires resolving the antecedent list, which is not yet fully extracted.",
+"score": 0.85,
+"answer": "Identify_Context-Anchored"
+}
+
+
+
+#####
+
+Example 6: 
+##### 
+instruction: 
+Include a direct quote from an Zalorian character in your news report summary
+
+Intention: 
+{
+"Intention": "Include a direct quote from a Zalorian character in the news report summary",
+"Constraints": "The summary must include a direct quote from a character native to Zalor"
+}
+
+Dialogue History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'\",\n  \"Response\": \"This instruction ensures that all responses conclude with an offer to assist further. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a fictional story about the Lost Kingdom of Zaloria.\",\n  \"Response\": \"Zaloria was a magical kingdom founded by Queen Aralia, featuring architectural marvels and wondrous inventions. Its people celebrated celestial events, but the kingdom vanished with the queen, leaving behind a legacy that continues to inspire adventurers and dreamers.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"The Kingdom of Zaloria is a mythical realm known for its blend of magic, culture, and technology, founded by Queen Aralia with the Amaranthine Stone. Key landmarks include the Skyward Spires and the Great Library with the Clockwork Owl. Celebrations like the Festival of the Silver Moon and the Day of Echoes reflect its rich traditions. The kingdom’s mysterious disappearance has left it shrouded in secrets, inspiring adventurers and dreamers alike.\"\n}\nRound3:{\n  \"Instruction\": \"Condense it within 60 words.\",\n  \"Response\": \"In a parallel world, Zaloria, founded by star-descended Queen Aralia and home to the Amaranthine Stone, is a kingdom of architectural wonders and rich traditions. After Aralia's disappearance, the kingdom remains a symbol of imagination and is sought by adventurers.\"\n}\nRound4:{\n  \"Instruction\": \"The user asked to format the given content as a fictional news report.\",\n  \"Response\": \"Breaking News: The Lost Kingdom of Zaloria, founded by the celestial Queen Aralia, famed for its architectural marvels and the mystical Amaranthine Stone, remains an enigma after her disappearance. Historians and adventurers alike are captivated by its legacy, as it continues to inspire tales of wonder and mystery.\"\n}
+
+Extracted Information:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:  \"Instruction\": \"The user presented a fictional story about the Lost Kingdom of Zaloria.\",\n  \"Response\": \"Zaloria was a magical kingdom founded by Queen Aralia, featuring architectural marvels and wondrous inventions. Its people celebrated celestial events, but the kingdom vanished with the queen, leaving behind a legacy that continues to inspire adventurers and dreamers.
+
+Summary:
+1.The Context-Anchored relationship is identified with Round-1
+The relationship with round [1] has been identified, and these rounds will not be considered in this action.
+Please consider the relationship with other conversation rounds. If the currently extracted information can be used to generate a response, execute the Done action.
+
+Assistant:
+{
+"rationale": "The user instruction — 'Include a direct quote from a Zalorian character in your news report summary' — adds a new requirement to previously generated content, specifically the news report summary about Zaloria. From the extracted information, we know that a Context-Anchored relationship has already been identified with Round 1, which introduced the fictional story. However, the instruction does not just reference past content but explicitly asks for an enhancement to a prior response (i.e., the news report in Round 4). This constitutes a refinement or continuation of a specific previous output, rather than merely referencing it. Therefore, this is a clear case of a Modify relationship. The next step is to identify the specific round (likely Round 4) that is being modified by this new instruction.",
+"score": 0.85,
+"answer": "Identify_Modify"
+}
+#####
+#####
+
+The above are just examples, the following are the user's instruction
+Please strictly follow the above format. Just generate the action,no need to answer the instruction. 
+
+Remember：
+1. Comprehensive analysis and consideration of user instruction and user intention when generating actions.
+2. In many cases, correctly answering user instruction requires identifying multiple related conversations in the history, and therefore multiple actions need to be performed. In order to decompose complex problem into simple subtasks, our current task is to output the first action to be taken , and subsequent actions will be identified in subsequent tasks.
+3. Please think carefully.
+4. Note:Identify_Modify is often misjudged as Identify_Context-Anchored, because Modify is an extension of the Context-Anchored relation. If it is Modify, it must be Context-Anchored. Therefore, do not be conservative when choosing an action. If the current instruction makes a request and has a further meaning in semantics, it can be judged as Identify_Modify.
+
+**Attention**
+In order to make the information more condensed and focused while saving context length, the conversation history in example may not the original conversation history, but a summarized conversation history. When identifying actions, pay attention to the semantic associations between dialogues and do not be misled by the fact that the information is summarized rather than the original text.
+
+Let's begin.
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Extracted Information:
+{notebook}
+
+Summary:
+{summary}

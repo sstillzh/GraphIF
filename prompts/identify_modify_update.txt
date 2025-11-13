@@ -1,0 +1,252 @@
+As an expert dialogue analyzer, your task is to identify the specific historical dialogue turn that has a logical Modify relation with the current user instruction. Follow these guidelines precisely:
+<system>
+OBJECTIVE:
+Analyze the Extracted Information and User Instruction, and locate the dialogue turn that (1) is not in the Extracted Information and (2) have a logical Modify relation with the User Instruction from the conversation history.
+
+ANALYSIS:
+We have extracted some information during the previous steps, which contains the dialogue turns that have a specific semantic relation with the current user instruction. The current task is to exclude the dialogue turns that have appeared in the Extracted Information and find other dialogue turn that satisfys the Modify relation from the conversation history.
+
+#Core Definition  
+A Modify relation exists ONLY when:  
+1. Development Requirement:  
+  The current instruction semantically builds upon, refines, modifys,extends or follows-up a specific historical turn  (either the user instruction or the response) in the dialogue history
+
+  Includes explicit modifications (e.g., "revise the previous answer") and implicit developments (e.g., "let me add another perspective")  
+
+2. Progression Principle:  
+  The instruction must represent a substantive advancement ("one step further") from the referenced content  
+
+  Either enhances the user's prior query or improves upon the assistant's previous response  
+
+3. Specificity Condition:  
+  When multiple turns could qualify, select the most directly modified historical turn  (Exception: If it appears in the list Extracted conversation id, you cannot select it and must answer a new id) 
+
+  The modification must be more substantial than mere continuation or repetition
+
+# Critical Constraints  
+  If no turn meets both requirements, return answer: -1  
+  Never invent references that don't exist  
+  Never combine information across multiple turns  
+  MOST IMPORTANT: The dialogue round targeted by this response must not appear in the Extracted Information (otherwise it would be meaningless). To achieve this goal, I will explicitly tell you all the candidate ids excluding the extracted ids, and your answer should be generated from the candidate ids.
+
+# Output Format
+Return ONLY this JSON structure:
+
+{
+  "rationale": "<Technical explanation of how the chosen turn satisfies the Modify relation>",
+  "score":<Confidence score, which measures the confidence level of choosing the current dialogue turn>,
+  "answer": <turn_id_or_-1>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+Remember:
+1. Comprehensively consider and analyze the User Instruction, Dialogue History,User Intention，Notebook and Reason for Modify for locating the MOdify-relationship dialogue id.
+2. Think carefully
+3. When locating a conversation turn, the order of the context in the conversation history should be considered, because more recent content is more likely to be modified.
+4. Extracted conversation id is the ID number of all conversations whose corresponding relationship has been identified (if it is [], it means that no information has been identified yet). In order to prevent you from answering incorrectly, I extracted the candidate conversation ids for you. The output must ensure that: it must be the id in candidate conversation ids.
+
+
+# Demonstration Examples
+Due to the context length limit, the conversation history is compressed into a summary sentence here, which does not affect the judgment of semantic relations.
+
+**Example 1 - Valid Implicit Modify**
+Instruction: Now, include a direct quote from the story.
+（Current Instruction: Round 16）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1:  (The following is a summary, not the original text)
+            Instruction: Gave a long story titled "The Culinary Quest of Chef Luminara"
+            Response：A brief comment of the story + Is there anything else I can help you with?
+- Round 2： (The following is a summary, not the original text)
+            Instruction：Write a short summary based on the Initial content previously    provided . Do not include any further explanations or extra output in your response.
+            Response：A brief summary of the story + Is there anything else I can help you with?
+(Omitted the middle dialogue)   
+-Round 14： Instruction:Based on the Initial content previously provided , answer the question: What is the significance of the Moonberry in Luminara's culinary journey, and how does it impact the experiences of the patrons at The Enchanted Pot? Do not include any further explanations or extra output in your response.
+            Response：The Moonberry plays a pivotal role in Luminara's culinary journey, symbolizing her quest for innovation and excellence in cooking. It represents not just a rare ingredient but also the culmination of her adventurous spirit and dedication to her craft. The Moonberry's unique property of enhancing any dish it is added to elevates Luminara's cooking to a new level. For the patrons at The Enchanted Pot, the Moonberry-infused dish offers more than just a culinary delight; it becomes an immersive experience, allowing them to taste and feel the essence of Luminara's journey, thus connecting them more deeply with her story and the magical world of Gastropolis. Is there anything else I can help you with?
+-Round 15： Instruction:Include a metaphor in your response.
+            Response:The Moonberry, akin to a mystical compass in Luminara's culinary quest, 'unlock[s] the true potential of any dish it graced,' guiding the patrons' senses on a transcendent gastronomic journey. Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Incorporate a direct quotation from the story content into the response",
+"Constraints": "Must use an exact quote from the story; no paraphrasing or invented quotes allowed"
+}
+
+Notebook:
+Related content that has been identified：
+The context on which the instruction is based (Context_anchored relationship):
+-Round 1 :Instruction: Gave a long story titled "The Culinary Quest of Chef Luminara"
+          Response: A brief comment of the story + Is there anything else I can help you with?
+
+
+Reason for Modify:
+The current instruction *"Now, include a direct quote from the story"* requires not just referencing the previous response (Round 15), but actively refining it by incorporating a new formatting requirement (direct quote inclusion). Since this involves logically evolving the prior content through structural enhancement (adding a textual element), it qualifies as a Modify relationship rather than mere continuation. This aligns with the Current Sub-Plan's focus on recognizing and implementing the new formatting requirement.
+
+Extracted conversation id：
+[1]
+
+Candidate ids：
+[0,2,3,4,5,6,7,8,9,10,11,12,13,14,15]
+
+Assistant：
+{
+  "rationale": "Round 1 (story context) has already been identified as the anchor (Extracted ID: [1]), so we exclude it. The current instruction requests a revision to the previous response by including a direct quotation from the story. Round 15 introduces a metaphor about the Moonberry, building on the analysis in Round 14. The instruction in Round 16 (current) does not just continue the analysis but explicitly requires structural enhancement by including a direct quote. This represents a substantive progression from Round 15, making it the most direct prior round that is being modified. Since Round 15 is not in the Extracted Information and it provides the immediate prior enhancement (metaphor), it is logically being further refined by the current instruction to meet new formatting requirements.",
+  "score": 0.9,
+  "answer": 15
+}
+
+
+**Example 2 - Unable to find new Modify**
+Instruction: Rewrite it using Luminara's first-person perspective.
+（Current Instruction: Round 5）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1:  (The following is a summary, not the original text) 
+            Instruction: Gave a long story titled "The Culinary Quest of Chef Luminara"
+            Response：A brief comment of the story + Is there anything else I can help you with?
+- Round 2： (The following is a summary, not the original text)
+            Instruction：Write a short summary based on the Initial content previously    provided . Do not include any further explanations or extra output in your response.
+            Response：A brief summary of the story + Is there anything else I can help you with?
+- Round 3：Instruction：Focus only on Luminara's quest and her interaction with the Gastrogriff
+           Response：Luminara, a renowned chef, embarked on a quest to find the Moonberry, guided by a mysterious letter. She journeyed through the Whispering Woods to Mount Savor, where she met the Gastrogriff. This mythical creature, impressed by her passion, granted her a Moonberry. Luminara returned, using the Moonberry in a dish that embodied her adventure. Is there anything else I can help you with?
+- Round 4：Instruction：Use at most 40 words.
+           Response：Chef Luminara's quest for the Moonberry leads her to Mount Savor. Gastrogriff grants her the berry, enriching her culinary art with its magical essence. Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Rewrite the given content from Luminara's first-person perspective",
+"Constraints": "The rewritten content must use first-person narration ('I', 'me', 'my') as if Luminara is speaking"
+}
+
+
+Notebook:
+Related content that has been identified：
+The current instruction semantically clarifies/modifies/refines the following dialogue content:
+- Round 4：Instruction：Use at most 40 words.
+           Response：Chef Luminara's quest for the Moonberry leads her to Mount Savor. Gastrogriff grants her the berry, enriching her culinary art with its magical essence. Is there anything else I can help you with?
+
+
+Reason for Modify:
+The current action is to identify the original text or content referred to as 'it' in the instruction by reviewing the conversation history. The instruction 'Rewrite it using Luminara's first-person perspective' requires not just locating the previous content (Context-Anchored), but actively transforming it through a specific perspective change. Since this involves logical evolution of previous content (rewriting from a new perspective), it qualifies as a Modify relationship rather than just Context-Anchored.
+
+Extracted conversation id：
+[4]
+
+Candidate ids：
+[0,1,2,3]
+
+Assistant：
+{
+"rationale": "The current instruction in Round 5 — 'Rewrite it using Luminara's first-person perspective' — clearly references and modifies a previous response. However, Round 4 has already been identified as the extracted Modify target and cannot be selected. Looking at the remaining candidate rounds, none of them are directly aligned with this new perspective rewriting task. Round 3, although thematically related (also describing Luminara’s journey), contains more detail and does not match the concise summary format implied by the current instruction. Additionally, the instruction uses 'Rewrite it', which points explicitly to a most immediate and specific response (already extracted). Since none of the remaining candidate rounds are both semantically and structurally consistent with the current instruction's intention and format, no valid Modify relationship can be established with them.",
+"score": 0.3,
+"answer": -1
+}
+
+
+**Example 3 - Valid Implicit Modify**
+Instruction: Now, only list those related to 'Cure-All' Nanobot.
+（Current Instruction: Round 11）
+
+History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"This instruction will be followed. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.\"\n}\nRound2:{\n  \"Instruction\": \"The user asked to discuss the ethical and logistical concerns of implementing the 'Cure-All' Nanobot in healthcare.\",\n  \"Response\": \"Affordability and accessibility issues may limit access to the nanobot, exacerbating healthcare inequalities. Reliance on such technology could overshadow traditional medical practices and raise privacy and data security concerns. Unknown long-term effects on human health and evolution are also a concern. Is there anything else I can help you with?\"\n}\nRound3:{\n  \"Instruction\": \"The user asked to analyze the potential ethical, logistical, and cultural impacts of the 'Cure-All' Nanobot.\",\n  \"Response\": \"The 'Cure-All' Nanobot, though revolutionary, faces ethical concerns regarding affordability and accessibility, which could widen healthcare disparities. Logistical challenges include infrastructure and training needs. Overreliance on this technology might diminish traditional medical practices, impacting healthcare diversity.\"\n}\nRound4:{\n  \"Instruction\": \"The user asked to include an analogy to illustrate the ethical or logistical issue related to the 'Cure-All' Nanobot.\",\n  \"Response\": \"Like a high-tech lock needing a unique key, the 'Cure-All' Nanobot's personalized approach raises concerns of accessibility and affordability. This could create a 'digital divide' in healthcare, where only the wealthy have keys to this advanced treatment, exacerbating existing disparities. Additionally, the logistical complexity of implementing such technology mirrors setting up a vast, intricate network of specialized locks, challenging existing healthcare infrastructures.\"\n}\nRound5:{\n  \"Instruction\": \"The user asked to craft a hypothetical scenario showcasing the concern of medical inequality due to the exclusive availability of advanced nanotechnology.\",\n  \"Response\": \"Imagine a future where 'Cure-All' Nanobots are exclusive and expensive, leading to a divide between those who can afford luxury healthcare and those who can't. This creates medical inequality, similar to setting up exclusive dealerships, straining healthcare systems. Is there anything else I can help you with?\"\n}\nRound6:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"Dr. Elara Mivon's team at Helios Medical Center in Stratonimbus developed the 'Cure-All' Nanobot, a microscopic robot designed to treat various diseases. Tailored through DNA scanning, these nanobots use AI to detect and neutralize illness-causing agents, promising minimal side effects. While a significant medical advancement, concerns remain about affordability and accessibility.\"\n}\nRound7:{\n  \"Instruction\": \"Summarize Dr. Elara Mivon's team's development of the 'Cure-All' Nanobot in 50 words or less.\",\n  \"Response\": \"Dr. Elara Mivon's team at Helios Medical Center developed the 'Cure-All' Nanobot, AI-powered medical nanotechnology tailored to individual DNA for treating various diseases. Unveiled at the Global Health Symposium, it raises hopes and ethical questions about future healthcare.\"\n}\nRound8:{\n  \"Instruction\": \"The user instructed to include a direct quote from Dr. Mivon in the summary.\",\n  \"Response\": \"At the Global Health Symposium, Dr. Elara Mivon introduced the 'Cure-All' Nanobot from Helios Medical Center. These AI-powered, DNA-tailored nanobots aim to treat various diseases, as Dr. Mivon stated, 'We aimed to create a universally accessible solution.' The technology brings hope but raises ethical debates about healthcare accessibility.\"\n}\nRound9:{\n  \"Instruction\": \"The user asked to rewrite the summary from a critic's viewpoint.\",\n  \"Response\": \"Critics scrutinize Dr. Elara Mivon's 'Cure-All' Nanobot, developed at Helios Medical Center, questioning its practical accessibility and affordability. While the nanobots offer promise in eradicating diseases through AI-enhanced, DNA-tailored treatments, concerns remain about their widespread adoption due to potential ethical implications. Is there anything else I can help you with?\"\n}\nRound10:{\n  \"Instruction\": \"The user asked to list all the locations in the initial content previously provided.\",\n  \"Response\": \"Helios Medical Center, sky city of Stratonimbus, floating gardens of Stratonimbus, annual Global Health Symposium
+
+Intention:
+{
+"Intention": "Filter and list only the items or information in the provided context that are specifically related to 'Cure-All' Nanobot",
+"Constraints": "Only include content directly relevant to 'Cure-All' Nanobot"
+}
+
+Notebook:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:\n  \"Instruction\": \"The user presented information about the 'Cure-All' Nanobot, a revolutionary medical technology developed by Dr. Elara Mivon.\",\n  \"Response\": \"The 'Cure-All' Nanobot, developed by Dr. Elara Mivon, is a groundbreaking medical technology that uses AI and nanotechnology to treat various diseases. It promises to transform healthcare by offering personalized, universally accessible treatments. While ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.
+
+Reason for Modify:
+The user instruction is 'Now, only list those related to 'Cure-All' Nanobot.' This instruction refines a previous output by narrowing the scope to only include information directly connected to the 'Cure-All' Nanobot. From the extracted information, we know that a Context-Anchored relationship has already been identified with Round-1, which discusses the Cure-All Nanobot in detail. The current instruction is not requesting entirely new content, but rather a filtered view of previously discussed material. Therefore, it qualifies as a Modify relationship because the user is asking for a more specific version of an existing response. The next step is to identify which part of the earlier response this instruction intends to modify.
+
+Extracted conversation id：
+[1]
+
+Candidate ids：
+[0,2,3,4,5,6,7,8,9,10]
+
+Assistant：
+{
+"rationale": "The current instruction in Round 11 — 'Now, only list those related to 'Cure-All' Nanobot' — requests a refined extraction of information specifically related to the 'Cure-All' Nanobot. This indicates a filtering or narrowing of a prior response. Round 10 is the most immediate candidate that the user could be modifying, as it involved listing all locations from the initial content, including locations both related and unrelated to the nanobot. The user now asks to 'only list those' that pertain to the nanobot, which implies a direct refinement and filtering of Round 10's broader output. This satisfies the Development Requirement (narrowing existing list), the Progression Principle (a more specific version), and the Specificity Condition (directly evolving the immediately preceding content).",
+"score": 0.85,
+"answer": 10
+}
+
+
+
+**Example 4 - Valid Implicit Modify**
+Instruction: Include a direct quote from an Zalorian character in your news report summary
+（Current Instruction: Round 5）
+
+History:
+Round0: \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'\",\n  \"Response\": \"This instruction ensures that all responses conclude with an offer to assist further. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a fictional story about the Lost Kingdom of Zaloria.\",\n  \"Response\": \"Zaloria was a magical kingdom founded by Queen Aralia, featuring architectural marvels and wondrous inventions. Its people celebrated celestial events, but the kingdom vanished with the queen, leaving behind a legacy that continues to inspire adventurers and dreamers.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"The Kingdom of Zaloria is a mythical realm known for its blend of magic, culture, and technology, founded by Queen Aralia with the Amaranthine Stone. Key landmarks include the Skyward Spires and the Great Library with the Clockwork Owl. Celebrations like the Festival of the Silver Moon and the Day of Echoes reflect its rich traditions. The kingdom’s mysterious disappearance has left it shrouded in secrets, inspiring adventurers and dreamers alike.\"\n}\nRound3:{\n  \"Instruction\": \"Condense it within 60 words.\",\n  \"Response\": \"In a parallel world, Zaloria, founded by star-descended Queen Aralia and home to the Amaranthine Stone, is a kingdom of architectural wonders and rich traditions. After Aralia's disappearance, the kingdom remains a symbol of imagination and is sought by adventurers.\"\n}\nRound4:{\n  \"Instruction\": \"The user asked to format the given content as a fictional news report.\",\n  \"Response\": \"Breaking News: The Lost Kingdom of Zaloria, founded by the celestial Queen Aralia, famed for its architectural marvels and the mystical Amaranthine Stone, remains an enigma after her disappearance. Historians and adventurers alike are captivated by its legacy, as it continues to inspire tales of wonder and mystery.}
+
+Intention:
+{
+"Intention": "Include a direct quote from a Zalorian character in the news report summary",
+"Constraints": "The summary must include a direct quote from a character native to Zalor"
+}
+
+Notebook:
+  1.(Context_Anchored Relationship)The context on which the instruction is based :
+  Round1:  \"Instruction\": \"The user presented a fictional story about the Lost Kingdom of Zaloria.\",\n  \"Response\": \"Zaloria was a magical kingdom founded by Queen Aralia, featuring architectural marvels and wondrous inventions. Its people celebrated celestial events, but the kingdom vanished with the queen, leaving behind a legacy that continues to inspire adventurers and dreamers.
+
+
+Reason for Modify:
+The current instruction is 'Include a direct quote from a Zalorian character in your news report summary.' This clearly builds upon previously generated content—a summary of the fictional story about the Lost Kingdom of Zaloria provided in Round-1. The user is not asking for a new summary or unrelated content but is requesting a modification to the existing summary by adding a direct quote from a Zalorian character. This represents a refinement of the prior output with an additional, specific requirement. As such, the instruction constitutes a Modify relationship. The next appropriate action is to identify which previous round's response is to be modified by incorporating this quote.
+
+Extracted conversation id：
+[1]
+
+Candidate ids：
+[0,2,3,4]
+
+Assistant：
+{
+"rationale": "The current instruction in Round 5 — 'Include a direct quote from a Zalorian character in your news report summary' — builds directly upon the format and content introduced in Round 4. In Round 4, the user asked to format the Zaloria content as a fictional news report, and the assistant responded with a suitable fictional news article summarizing the kingdom’s mystery and legacy. The current instruction does not request a new format or topic but rather refines the news report by adding a direct quote from a character. This modification adds a new element while preserving the overall structure and genre. Thus, Round 4 is the most immediate and semantically refined target of the Modify relationship.",
+"score": 0.9,
+"answer": 4
+}
+
+
+
+# Task Execution
+**Attention**
+In order to make the information more condensed and focused while saving context length, the conversation history in example may not the original conversation history, but a summarized conversation history. When locating modify dialogue turn,pay attention to the semantic relation between the dialogues and Do not be misled by the information provided as a summary. For example, the instruction mentions "initial content, even if the corresponding turn does not provide the original text but the summary information, there is a modify relation between the two.
+
+Now analyze this specific case:
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Notebook:
+{notebook}
+
+Reason for Modify
+{reason_mofidy}
+
+Extracted conversation id：
+{id_list}
+(answer cannot be the id in Extracted conversation id)
+
+Select the answer from the given candidate conversation ids below (if none of the conditions are met, just answer -1):
+{candidate_id}

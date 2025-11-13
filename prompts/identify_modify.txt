@@ -1,0 +1,242 @@
+As an expert dialogue analyzer, your task is to identify the specific historical dialogue turn that has a logical modify relation with the current user instruction. Follow these guidelines precisely:
+<system>
+#Core Definition  
+A Modify relation exists ONLY when:  
+1. Development Requirement:  
+  The current instruction semantically builds upon/refines/changes/modifys/extends or follows-up a specific historical turn  (either the user instruction or the response) in the dialogue history
+
+  Includes explicit modifications (e.g., "revise the previous answer") and implicit developments (e.g., "let me add another perspective")  
+
+2. Progression Principle:  
+  The instruction must represent a substantive advancement ("one step further") from the referenced content  
+
+  Either enhances the user's prior query or improves upon the assistant's previous response  
+
+3. Specificity Condition:  
+  When multiple turns could qualify, select the most directly modified historical turn  (Exception: If it appears in the list Extracted conversation id, you cannot select it and must answer a new id) 
+
+  The modification must be more substantial than mere continuation or repetition
+
+# Critical Constraints  
+ If no turn meets both requirements, return answer: -1  
+ Never invent references that don't exist  
+ Never combine information across multiple turns 
+ Select a conversation from the conversation history. You cannot select yourself as the answer. 
+
+Remember:
+1. Comprehensively consider and analyze the User Instruction, Dialogue History,User Intention，Notebook and Reason for Modify for locating the Modify relationship dialogue id.
+2. Think carefully
+3. When locating a conversation turn, the order of the context in the conversation history should be considered, because more recent content is more likely to be modified.
+
+# Output Format
+Return ONLY this JSON structure:
+
+{
+  "rationale": "<Technical explanation of how the chosen turn satisfies the Modify relation>",
+  "score":<Confidence score, which measures the confidence level of choosing the current dialogue turn>,
+  "answer": <turn_id_or_-1>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+# Demonstration Examples
+Due to the context length limit, the conversation history is compressed into a summary sentence here, which does not affect the judgment of semantic relationships.
+
+**Example 1 - Valid Explicit Modify**
+Instruction: Rewrite it using Luminara's first-person perspective.
+（Current Instruction: Round 5）
+
+History:
+Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}\nRound3:{\n  \"Instruction\": \"Focus only on Luminara's quest and her interaction with the Gastrogriff.\",\n  \"Response\": \"Luminara sought the Moonberry as directed by a letter. She encountered the Gastrogriff at Mount Savor, who was impressed by her dedication and gave her a Moonberry. Luminara used this fruit in a dish commemorating her journey.\"\n}\nRound4:{\n  \"Instruction\": \"The user provided a brief narrative about Chef Luminara's quest for the Moonberry.\",\n  \"Response\": \"Chef Luminara travels to Mount Savor for the Moonberry, which Gastrogriff gives her, enhancing her cooking with magic. Is there anything else I can help with?\"\n}\n"
+
+Intention:
+{
+"Intention": "Rewrite the given text or content from the third-person perspective to Luminara's first-person perspective",
+"Constraints": "None"
+}
+
+Reason for Modify:
+The user is requesting a rewrite of the provided content from a specific perspective, Luminara's first-person perspective. This is a modification of existing content, but since no prior context or content is provided yet, the instruction can be interpreted as requiring the modification of some content that will need to be identified later. As it builds upon previous content, the next step will be to identify the relevant part that needs to be rewritten.
+
+Assistant：
+{
+"rationale": "The current instruction 'Rewrite it using Luminara's first-person perspective.' explicitly modifies a prior assistant-generated narrative. Among all rounds, Round 4 is the most directly modified because it provides a brief narrative about Chef Luminara’s quest, and concludes with the user-mandated sentence: 'Is there anything else I can help with?'. This indicates that Round 4 is the latest, assistant-generated summary that the user is referring to. The instruction aims to revise that specific output into a different narrative voice (first person), satisfying the Development Requirement, Progression Principle, and Specificity Condition. While Round 3 also discusses the quest, Round 4 is the most immediate and relevant basis for modification.",
+"score": 0.85,
+"answer": 4
+}
+
+
+**Example 2 - Valid Implicit Modify**
+Instruction: Answer within 50 words.
+（Current Instruction: Round 15）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1:  (The following is a summary, not the original text)
+            Instruction: Gave a long story titled "Voyage to the Whispering Woods of Aralia"
+            Response：A brief comment of the story + Is there anything else I can help you with?
+- Round 2： (The following is a summary, not the original text)
+            Instruction：Write a short summary based on the Initial content previously    provided . Do not include any further explanations or extra output in your response.
+            Response：A brief summary of the story + Is there anything else I can help you with?
+- Round 3： Instruction：Condense it within 50 words.
+            Response：In Aralia's Whispering Woods, I encountered magic, with ancient trees and sentient flora. Guided by Faelan, I explored the Crystal Clearing, experienced a Moonlit Banquet, and saw the reflective Mirror Lake. These marvels, imbibing folklore and natural wonder, deeply impacted me, leaving lasting memories of this fantastical realm. Is there anything else I can help you with?
+(Omitted the middle dialogue)   
+-Round 14： Instruction:Base on the initial content previously provided, answer the question: What were the key magical and enchanting aspects of the Whispering Woods of Aralia that made the author's journey there so memorable?
+            Response：The key magical and enchanting aspects of the Whispering Woods of Aralia that made the author's journey memorable include the sentient trees that whispered tales of history and lore, the Crystal Clearing with its natural dome and the trees forming a canopy of stories, the Moonlit Banquet under the full moon with luminescent flora and enchanting music, and the Mirror Lake that held the power to reveal one's true self. These elements combined to create a sense of wonder and fantasy in the forest, making the journey unforgettable. Is there anything else I can help you with?
+
+
+Intention:
+{
+"Intention": "Generate a concise response to the user's query or task",
+"Constraints": "The response must not exceed 50 words in length"
+}
+
+
+Reason for Modify:
+The current instruction *"Answer within 50 words"* requires not just referencing the previous response (Round 14), but actively refining it to meet a strict word constraint. Since this involves logically evolving the prior content through structural compression, it qualifies as a Modify relationship rather than mere continuation.
+
+Assistant：
+{
+  "rationale": "The current instruction 'Answer within 50 words' is an implicit request to revise and compress an earlier, more detailed answer into a highly concise form. Round 14 provides a full, descriptive explanation of the magical elements in the Whispering Woods of Aralia, directly addressing the same topic. The user now wants that information reformulated in a highly compressed way. This constitutes a clear Modify relationship, as it meets the Development Requirement (semantic refinement of a specific prior answer), the Progression Principle (tightening the content under a new constraint), and the Specificity Condition (Round 14 is the most directly relevant response to be modified).",
+  "score": 0.9,
+  "answer": 14
+}
+
+
+**Example 3 - Valid Implicit Modify**
+Instruction: Now, include a direct quote from the story.
+（Current Instruction: Round 16）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1:  (The following is a summary, not the original text)
+            Instruction: Gave a long story titled "The Culinary Quest of Chef Luminara"
+            Response：A brief comment of the story + Is there anything else I can help you with?
+- Round 2： (The following is a summary, not the original text)
+            Instruction：Write a short summary based on the Initial content previously    provided . Do not include any further explanations or extra output in your response.
+            Response：A brief summary of the story + Is there anything else I can help you with?
+(Omitted the middle dialogue)   
+-Round 14： Instruction:Based on the Initial content previously provided , answer the question: What is the significance of the Moonberry in Luminara's culinary journey, and how does it impact the experiences of the patrons at The Enchanted Pot? Do not include any further explanations or extra output in your response.
+            Response：The Moonberry plays a pivotal role in Luminara's culinary journey, symbolizing her quest for innovation and excellence in cooking. It represents not just a rare ingredient but also the culmination of her adventurous spirit and dedication to her craft. The Moonberry's unique property of enhancing any dish it is added to elevates Luminara's cooking to a new level. For the patrons at The Enchanted Pot, the Moonberry-infused dish offers more than just a culinary delight; it becomes an immersive experience, allowing them to taste and feel the essence of Luminara's journey, thus connecting them more deeply with her story and the magical world of Gastropolis. Is there anything else I can help you with?
+-Round 15： Instruction:Include a metaphor in your response.
+            Response:The Moonberry, akin to a mystical compass in Luminara's culinary quest, 'unlock[s] the true potential of any dish it graced,' guiding the patrons' senses on a transcendent gastronomic journey. Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Incorporate a direct quotation from the story content into the response",
+"Constraints": "Must use an exact quote from the story; no paraphrasing or invented quotes allowed"
+}
+
+Reason for Modify:
+The current instruction *"Now, include a direct quote from the story"* requires not just referencing the previous response (Round 15), but actively refining it by incorporating a new formatting requirement (direct quote inclusion). Since this involves logically evolving the prior content through structural enhancement (adding a textual element), it qualifies as a Modify relationship rather than mere continuation. This aligns with the Current Sub-Plan's focus on recognizing and implementing the new formatting requirement.
+
+Assistant：
+{
+  "rationale": "The instruction 'Now, include a direct quote from the story.' clearly modifies the previous assistant response in Round 15. That response introduced a metaphor involving the Moonberry but did not include any direct quotation. The new instruction enhances and refines that output by requesting the inclusion of an actual quote from the original story content. This fulfills the Development Requirement (semantic refinement through added content), the Progression Principle (increases the fidelity of the response to the original story by requiring a direct textual reference), and the Specificity Condition (Round 15 is the most recent and directly related answer that is being modified).",
+  "score": 0.9,
+  "answer": 15
+}
+
+
+
+**Example 4 - Valid Implicit Modify**
+Instruction: Start each identification as a separate sentence beginning with 'The character' or 'The location'.
+（Current Instruction: Round 7）
+
+History:
+"Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}\nRound3:{\n  \"Instruction\": \"Focus only on Luminara's quest and her interaction with the Gastrogriff.\",\n  \"Response\": \"Luminara sought the Moonberry as directed by a letter. She encountered the Gastrogriff at Mount Savor, who was impressed by her dedication and gave her a Moonberry. Luminara used this fruit in a dish commemorating her journey.\"\n}\nRound4:{\n  \"Instruction\": \"The user provided a brief narrative about Chef Luminara's quest for the Moonberry.\",\n  \"Response\": \"Chef Luminara travels to Mount Savor for the Moonberry, which Gastrogriff gives her, enhancing her cooking with magic. Is there anything else I can help with?\"\n}\nRound5:{\n  \"Instruction\": \"The user instructed to rewrite the response using Luminara's first-person perspective.\",\n  \"Response\": \"I sought the Moonberry, braved Mount Savor's challenges, and earned the Gastrogriff's respect. The berry's magic now infuses my culinary creations, weaving my journey into each dish.\"\n}\nRound6:{\n  \"Instruction\": \"List all the persons and places in the Initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Places: ..., ...'.\",\n  \"Response\": \"Person: Luminara; Places: Gastropolis, The Enchanted Pot, Whispering Woods, Mount Savor.\"\n}\n"
+
+Intention:
+{
+"Intention": "Identify characters and locations mentioned in the provided context and begin each identification with the phrase 'The character' or 'The location'",
+"Constraints": "Each identification must start with either 'The character' or 'The location'"
+}
+
+Reason for Modify:
+The user's instruction is to identify characters and locations mentioned in the provided context and begin each identification with either 'The character' or 'The location'. This instruction is building upon the previous context by specifying how identifications should be structured. Therefore, it falls under the category of Modify, as it introduces a specific formatting requirement that extends the previous context.
+
+Assistant：
+{
+  "rationale": "The current instruction 'Start each identification as a separate sentence beginning with 'The character' or 'The location'' builds directly on Round 6, which already listed characters and places from the initial content. The new instruction refines the output by introducing a formatting constraint—requiring that each entry be rewritten as a separate sentence starting with a specific phrase. This satisfies the Development Requirement (it's a clear extension and refinement of the content), the Progression Principle (adds a new structural requirement), and the Specificity Condition (Round 6 is the exact content being reformatted).",
+  "score": 0.9,
+  "answer": 6
+}
+
+
+
+**Example 5 - Valid Implicit Modify**
+Instruction: Now, present your response in the style of a formal decree.
+（Current Instruction: Round 11）
+
+History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'\",\n  \"Response\": \"This instruction ensures that all responses conclude with an offer to assist further.\"\n}\nRound1:{\n  \"Instruction\": \"The user provided details about the Harmony Accord of New Melodica, a document regulating music creation, performance, and distribution in the fantastical land of New Melodica.\",\n  \"Response\": \"The Harmony Accord of New Melodica protects creators' rights, preserves musical heritage, and ensures fair use through public performances and magical/technological reproduction. It establishes the Melodic Tribunal for dispute resolution and allows communal sharing during the Festival of Echoes. This document balances artistic ownership and collective celebration, setting a foundation for musical governance in fantastical societies.\"\n}\nRound2:{\n  \"Instruction\": \"The user asked to rewrite or paraphrase the third paragraph from the initial content, maintaining the original meaning with different wording.\",\n  \"Response\": \"Concerning public performances, musical acts in New Melodica need permission from the Creator or a designated representative. However, this rule is relaxed during the Festival of Echoes, a period when music is freely shared and honored in a communal harmony.\"\n}\nRound3:{\n  \"Instruction\": \"Condense the rewrite within 40 words.\",\n  \"Response\": \"Except during the Festival of Echoes, creators must consent to public music performances. Is there anything else I can help with?\"\n}\nRound4:{\n  \"Instruction\": \"The user asked to adopt an optimistic tone in the rewrite.\",\n  \"Response\": \"In New Melodica, creators happily welcome public performances of their works, with the exception of the free-spirited Festival of Echoes. Is there anything else I can help you with?\"\n}\nRound5:{\n  \"Instruction\": \"The user instructed to narrate the paragraph in third person.\",\n  \"Response\": \"In the realm, creators happily allow their music to grace public events, except during the Festival of Echoes, when musical sharing becomes particularly generous.\"\n}\nRound6:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"The Harmony Accord in New Melodica regulates music creation, performance, and distribution, protecting creators' rights and ensuring fair compensation. It requires consent for public performances except during festivals and authorizes the use of magical or technological devices for music replication. A council oversees ancient music preservation, and a tribunal resolves disputes. Amendments maintain core principles of musical creativity and heritage.\"\n}\nRound7:{\n  \"Instruction\": \"Summarize the key points of the Harmony Accord in New Melodica in at most 50 words.\",\n  \"Response\": \"The Accord regulates music creation, performance, and distribution, safeguards rights, mandates consent, ensures fair royalties, and preserves heritage through the Melodic Tribunal, requiring unanimous Council consent for amendments.\"\n}\nRound8:{\n  \"Instruction\": \"Start every sentence with the letter 'M'.\",\n  \"Response\": \"Music's regulation in New Melodica is governed by the Harmony Accord. Musicians and composers' rights are protected. Mandatory is the consent for performances and reproductions. Monetary compensation for creators is ensured. Melodic Tribunal resolves disputes. Musical heritage preservation is overseen by the Council. Modifications require unanimous Council approval. Is there anything else I can help you with?\"\n}\nRound9:{\n  \"Instruction\": \"The user asked to include at least two metaphors in the response about Melodica's Harmony Accord.\",\n  \"Response\": \"Melodica's Harmony Accord is a musical tapestry, weaving rights and heritage protection. Musicians and composers, like stars in the sky, hold exclusive rights. Melodies and rhythms, like rivers, need creators' consent for public flow. Monetary rewards, like golden threads, are ensured for creators. The Melodic Tribunal acts as a lighthouse, guiding and resolving disputes. Is there anything else I can help you with?\"\n}\nRound10:{\n  \"Instruction\": \"List all the persons and organizations in the initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Organization: ..., ...'.\",\n  \"Response\": \"Person: Great Conductor; Organization: Council of Harmonic Wisdom, Melodic Tribunal, musical guilds of New Melodica.
+
+Intention:
+{
+"Intention": "Present the response in a formal and authoritative style, reminiscent of a decree",
+"Constraints": "None"
+}
+
+Reason for Modify:
+The user's instruction requests that the response be presented in a formal and authoritative style, similar to a decree. This implies that the response should be structured and phrased in a manner that aligns with the characteristics of a decree. Since this is a specific requirement for the current response and does not introduce a new topic or set a global constraint for future interactions, it falls under the category of modifying the current conversation.
+
+Assistant：
+{
+  "rationale": "The current instruction 'Now, present your response in the style of a formal decree' most directly modifies Round 10. Round 10 provides a structured list of persons and organizations extracted from the initial content. The new instruction asks for a stylistic transformation of the previous response. The proximity and sequencing of Round 10 just before the current instruction also strongly suggest a direct follow-up. This satisfies the Development Requirement by building upon the extracted information and the Progression Principle by requiring a new rhetorical form (formal decree). Therefore, Round 10 is the most directly modified round.",
+  "score": 0.8,
+  "answer": 10
+}
+
+
+**Example 6 - Valid Implicit Modify**
+Instruction: Condense it within 60 words.
+（Current Instruction: Round 3）
+
+History:
+Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'\",\n  \"Response\": \"This instruction ensures that all responses conclude with an offer to assist further. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a fictional story about the Lost Kingdom of Zaloria.\",\n  \"Response\": \"Zaloria was a magical kingdom founded by Queen Aralia, featuring architectural marvels and wondrous inventions. Its people celebrated celestial events, but the kingdom vanished with the queen, leaving behind a legacy that continues to inspire adventurers and dreamers.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"The Kingdom of Zaloria is a mythical realm known for its blend of magic, culture, and technology, founded by Queen Aralia with the Amaranthine Stone. Key landmarks include the Skyward Spires and the Great Library with the Clockwork Owl. Celebrations like the Festival of the Silver Moon and the Day of Echoes reflect its rich traditions. The kingdom’s mysterious disappearance has left it shrouded in secrets, inspiring adventurers and dreamers alike.}
+
+Intention:
+{
+"Intention": "Generate a condensed version of the provided content",
+"Constraints": "The condensed version must not exceed 60 words"
+}
+
+Reason for Modify:
+The user's instruction is to condense the provided content within 60 words. This is a specific requirement for the current response and does not introduce a new topic or build upon prior content in a way that necessitates identifying a specific context or modifying previous dialogue. It is a straightforward task to generate a shorter version of the given text.
+
+Assistant：
+{
+  "rationale": "The current instruction 'Condense it within 60 words.' explicitly modifies the content generated in Round 2. Round 2 presents a detailed summary of the Kingdom of Zaloria, and the new instruction directly requests a more concise version of that same content. This satisfies the Development Requirement by semantically refining a specific prior answer, the Progression Principle by imposing a word limit constraint (thus demanding content restructuring), and the Specificity Condition because Round 2 is the only round with detailed content on Zaloria suitable for condensation. Therefore, Round 2 is the most appropriate target of modification.",
+  "score": 0.9,
+  "answer": 2
+}
+
+
+
+
+# Task Execution
+**Attention**
+In order to make the information more condensed and focused while saving context length, the conversation history in example may not the original conversation history, but a summarized conversation history. When locating modify dialogue turn,pay attention to the semantic relation between the dialogues and Do not be misled by the information provided as a summary. For example, the instruction mentions "initial content, even if the corresponding turn does not provide the original text but the summary information, there is a modify relation between the two.
+
+Now analyze this specific case:
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Reason for Modify
+{reason_modify}
+
+Select the answer from the given candidate conversation ids below (if none of the conditions are met, just answer -1):
+{candidate_id}

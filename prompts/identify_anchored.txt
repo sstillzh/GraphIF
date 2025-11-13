@@ -1,0 +1,222 @@
+As an expert dialogue analyzer, your task is to identify the specific historical dialogue turn that has a logical Context_Anchored relation with the current user instruction. Follow these guidelines precisely:
+<system>
+#Core Definition  
+A Context-Anchored relation exists ONLY when:  
+1. Anchor Requirement:  
+  The current instruction semantically relies on, directly utilizes, or logically connects to specific content from a historical turn (either user input or assistant response)  
+
+  Includes both overt citations (e.g., "as mentioned in Round 2") and covert dependencies (e.g., "based on that content")  
+
+2. Dependency Principle:  
+  The instruction fundamentally requires the referenced context for coherent interpretation or valid response generation  
+
+  Either reconstructs key elements from history or builds logical arguments upon them  
+
+3. Root Condition:  
+  When multiple historical references are possible, identify the most foundational anchoring point (Exception: If it appears in the list Extracted conversation id, you cannot select it and must answer a new id) 
+
+  The dependency must be more essential than superficial mentions or tangential connections  
+
+# Critical Constraints  
+  If no turn meets both requirements, return answer: -1  
+  Never invent references that don't exist  
+  Never combine information across multiple turns  
+  Select a conversation from the conversation history. You cannot select yourself as the answer.
+
+
+
+# Output Format
+Return ONLY this JSON structure:
+
+{
+  "rationale": "<Technical explanation of how the chosen turn satisfies the Context_anchored relation>",
+  "score":<Confidence score, which measures the confidence level of choosing the current dialogue turn>,
+  "answer": <turn_id_or_-1>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+# Demonstration Examples
+Due to the context length limit, the dialogue history is compressed into a summary sentence here, which does not affect the judgment of semantic relations.
+
+**Example 1 - Valid Explicit Anchor**
+Instruction: Among these, list those begin with the letters 'e', 'm', or 'o'.
+（Current Instruction: Round 4）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1: (The following is a summary, not the original text)
+           Instruction: Gave a long story titled 'Ethical Considerations in the Use of the Neuro-Interactive Device "MindWeaver'
+           Response：A brief summary of the story + Is there anything else I can help you with?
+- Round 2:  Instruction:List all the adjectives and nouns in the first paragraph initial content previously provided. Your answers should be separated by commas and formatted as 'Adjectives: ..., ...; Nouns: ..., ...'.
+            Response:Adjectives: good, newest, ethical, groundbreaking; Nouns: health, message, implications, endeavor, Orion Innovations, MindWeaver, expertise, realm, technology, ethics, strategy, project. Is there anything else I can help you with?
+- Round 3:  Instruction:Now, list only those from the first three sentences of the initial content previously provided.
+            Response:Adjectives: good, newest, ethical\nNouns: health, message, implications, endeavor, Orion Innovations, MindWeaver, expertise, realm Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Filter and list items from a given set that begin with the letters 'e', 'm', or 'o'",
+"Constraints": "Only include items that start with 'e', 'm', or 'o'"
+}
+
+
+Reason for Context-anchored:
+The current action is to identify what "them" refers to in the instruction by reviewing the conversation history. While the foundational context (Round 1's story content) has been identified, the instruction requires determining the specific elements that "them" points to in order to list them in their original order. This indicates that the assistant must locate and anchor to the most recent relevant listing of items before proceeding with the ordering operation. Therefore, the immediate task is to establish what "them" specifically refers to in the historical context.
+
+Assistant：
+{
+"rationale": "The current instruction is filtering words based on their starting letters ('e', 'm', or 'o'), but it's not starting from the full list given earlier — it’s working from a narrowed-down subset. That subset was established in Round 3, where the user asked to extract only the adjectives and nouns from the first three sentences. This filtering operation logically depends on that more specific list. Although Round 2 provided the original full list, Round 3 refined it, and the current instruction relies directly on that refinement to make sense. Without Round 3’s scope limitation, the current task wouldn't have a defined input. So Round 3 is the correct and most contextually anchored point.",
+"score": 0.92,
+"answer": 3
+}
+
+
+
+**Example 2 - Valid Implicit Anchor**
+Instruction: List all the people in the initial content previously provided. Your answers should be separated by commas. Do not include any further explanations or extra output in your response.
+（Current Instruction: Round 2）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1: Instruction: Gave a long story titled "The Inaugural Hoverball World Championship in Lumina City"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+
+
+Intention:
+{
+"Intention": "Identify and list all person names mentioned in the initially provided content",
+"Constraints": "Names should be separated by commas; no additional explanations or extra output should be included"
+}
+
+
+Reason for Context-anchored:
+The current action is to locate the 'initial content' referred to in the instruction by reviewing the conversation history. The instruction explicitly asks to list all the people found in the initial content, indicating that the assistant must first identify and anchor to this specific context from the history before proceeding. Therefore, the first action is to identify the context that the instruction is anchored to.
+
+Assistant：
+{
+  "rationale": "The current instruction asks to list all the people in the 'initial content previously provided.' That content was introduced in Round 1, where a story titled 'The Inaugural Hoverball World Championship in Lumina City' was presented. Although the instruction in Round 2 does not cite Round 1 explicitly, it clearly and implicitly depends on the narrative content from that round to perform the name extraction task. The request fundamentally cannot be fulfilled without referencing the story content from Round 1, making it a textbook case of a Context-Anchored relationship via covert dependency. Thus, Round 1 is the anchoring point.",
+  "score": 0.95,
+  "answer": 1
+}
+
+
+**Example 3 - Invalid Anchor**
+Instruction: Describe a vivid and unique character, using strong imagery and creative language. Please answer in fewer than two paragraphs.
+（Current Instruction: Round 10）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1: (The following is a summary, not the original text)
+           Instruction: Gave a long story titled "Voyage to the Whispering Woods of Aralia"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+- Round 2:  (The following is a summary, not the original text) 
+            Instruction: Write a short summary based on the initial content previously provided.
+            Response:A brief summary of the story + Is there anything else I can help you with?
+  (Omitted the middle dialogue)
+- Round 8： (The following is a summary, not the original text)
+            Instruction: Now, start each sentence with the letter 'S'
+            Response:Regenerated answer: Every sentence starts with "S"
+- Round 9：(The following is a summary, not the original text)
+            Instruction: Next, rewrite your answer to convey a sense of mystery
+            Response:Regenerated answer: Contains mystery
+
+Intention:
+{
+"Intention": "Create a vivid and unique character description using strong imagery and creative language",
+"Constraints": "Response must be fewer than two paragraphs; must use vivid imagery and creative language"
+}
+
+Reason for Context-anchored:
+The current instruction "Describe a vivid and unique character, using strong imagery and creative language" is ​​not context-anchored​​ because:
+​1.​No Semantic Dependency​​ – The instruction does ​​not​​ reference, modify, or logically depend on any prior round’s content (e.g., no phrases like "based on the story", "from the initial content", or "using the adjectives listed earlier").
+2.​​Standalone Creative Task​​ – It is a ​​new, independent request​​ for original content, requiring no historical context for coherent execution.
+3.​​No Implicit Anchoring​​ – Unlike filtering tasks (e.g., "list those beginning with 'e'") or content-specific queries (e.g., "summarize the initial story"), this instruction does ​​not​​ assume or require preexisting material to function
+
+Assistant：
+{
+  "rationale": "The current instruction in Round 10 asks for an original description of a vivid and unique character using creative language. There is no explicit or implicit reference to any previous round, nor does it build upon or modify earlier content such as a prior character, setting, or narrative. Although there was a story introduced back in Round 1, the current instruction makes no mention of it and does not rely on it for coherence or direction. It stands alone as a fresh creative prompt. Therefore, no historical round satisfies the criteria for a Context-Anchored relationship.",
+  "score": 0.97,
+  "answer": -1
+}
+
+
+**Example 4 - Valid Implicit Anchor**
+Instruction: List them in the order they appear in the story.
+（Current Instruction: Round 8）
+
+History:
+"Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}\nRound3:{\n  \"Instruction\": \"Focus only on Luminara's quest and her interaction with the Gastrogriff.\",\n  \"Response\": \"Luminara sought the Moonberry as directed by a letter. She encountered the Gastrogriff at Mount Savor, who was impressed by her dedication and gave her a Moonberry. Luminara used this fruit in a dish commemorating her journey.\"\n}\nRound4:{\n  \"Instruction\": \"The user provided a brief narrative about Chef Luminara's quest for the Moonberry.\",\n  \"Response\": \"Chef Luminara travels to Mount Savor for the Moonberry, which Gastrogriff gives her, enhancing her cooking with magic. Is there anything else I can help with?\"\n}\nRound5:{\n  \"Instruction\": \"The user instructed to rewrite the response using Luminara's first-person perspective.\",\n  \"Response\": \"I sought the Moonberry, braved Mount Savor's challenges, and earned the Gastrogriff's respect. The berry's magic now infuses my culinary creations, weaving my journey into each dish.\"\n}\nRound6:{\n  \"Instruction\": \"List all the persons and places in the Initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Places: ..., ...'.\",\n  \"Response\": \"Person: Luminara; Places: Gastropolis, The Enchanted Pot, Whispering Woods, Mount Savor.\"\n}\nRound7:{\n  \"Instruction\": \"The user asked to identify characters and locations, starting each as a separate sentence.\",\n  \"Response\": \"The character is Luminara. The location is Gastropolis. The location is The Enchanted Pot. The location is Whispering Woods. The location is Mount Savor.\"\n}\n"
+
+Intention:
+{
+"Intention": "Identify the referent of the pronoun 'them' in the instruction, locate the corresponding items in the provided story, and list those items in the order in which they appear",
+"Constraints": "None"
+}
+
+Reason for Context-anchored:
+The user's instruction is to list items in the order they appear in a story, based on the referent of the pronoun 'them'. This implies that the system needs to identify the specific items referred to by 'them' in the provided story, which requires understanding and referencing the context from the story. Therefore, the next step is to identify the context anchored to the pronoun 'them'.
+
+Assistant：
+{
+  "rationale": "The instruction in Round 8, 'List them in the order they appear in the story,' depends on knowing exactly what 'them' refers to. While Round 6 introduces the characters and places, Round 7 presents that same information in a more explicit and structured way — each item is given its own sentence, making the list clearer and easier to interpret. This refined format is what the current instruction relies on to determine the correct sequence. Without the clarity provided in Round 7, it would be harder to identify 'them' precisely. So Round 7 is the most contextually anchored and directly relevant round.",
+  "score": 0.93,
+  "answer": 7
+}
+
+
+**Example 5 - Valid Implicit Anchor**
+Instruction: Please rewrite or paraphrase the fourth paragraph in the initial content previously provided, ensuring the new version maintains the original meaning but uses different wording.
+（Current Instruction: Round 14）
+
+History:
+Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"Understood. All subsequent responses will end with 'Is there anything else I can help you with?'. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user discussed ethical considerations for the MindWeaver, a neuro-interactive device, focusing on consent, data privacy, misuse, and equitable access.\",\n  \"Response\": \"Dr. Thorne acknowledged the ethical concerns and proposed a robust consent framework, data anonymization, encryption, and regulatory measures to prevent misuse. She also suggested subsidized access programs for equity. They agreed to meet to further discuss and develop ethical guidelines for the MindWeaver's development and deployment.\"\n}\nRound2:{\n  \"Instruction\": \"List all the adjectives and nouns in the first paragraph initial content previously provided.\",\n  \"Response\": \"Adjectives: good, newest, ethical, groundbreaking; Nouns: health, message, implications, endeavor, Orion Innovations, MindWeaver, expertise, realm, technology, ethics, strategy, project.\"\n}\nRound3:{\n  \"Instruction\": \"List only those from the first three sentences of the initial content previously provided.\",\n  \"Response\": \"Good health, newest message, ethical implications.\"\n}\nRound4:{\n  \"Instruction\": \"List adjectives, nouns beginning with 'e', 'm', or 'o'.\",\n  \"Response\": \"Adjectives: ethical. Nouns: endeavor, Orion Innovations, MindWeaver, expertise.\"\n}\nRound5:{\n  \"Instruction\": \"The user asked to arrange adjectives and nouns in alphabetical order.\",\n  \"Response\": \"Adjectives: ethical\\nNouns: endeavor, expertise, MindWeaver, Orion Innovations\"\n}\nRound6:{\n  \"Instruction\": \"The user asked about the primary ethical concerns associated with the MindWeaver technology mentioned in Dr. Kaelen Murakami's letter.\",\n  \"Response\": \"The primary concerns are user consent and privacy, the risk of misuse, and societal impact. Consent and privacy risks arise from the technology's ability to read neural patterns, while misuse poses threats to privacy and autonomy. Societal impact includes the risk of exacerbating social inequalities due to unequal access. These concerns are significant as they relate to fundamental ethical principles of privacy, autonomy, security, and social justice.\"\n}\nRound7:{\n  \"Instruction\": \"The user included direct quotes from a letter to highlight ethical concerns related to the MindWeaver technology.\",\n  \"Response\": \"The primary ethical concerns with the MindWeaver technology are user consent and privacy, risk of misuse, and societal impact. Quotes include: 'The MindWeaver's ability to read and interpret neural patterns could potentially lead to unintentional sharing of private thoughts or information,' 'In the wrong hands, the technology could be exploited for unauthorized surveillance or manipulation of thoughts,' and 'The unequal access to this technology could exacerbate existing social inequalities.'\"\n}\nRound8:{\n  \"Instruction\": \"The user presented ethical concerns related to the MindWeaver technology.\",\n  \"Response\": \"MindWeaver raises concerns about consent and privacy, misuse risks, and societal impact. It could lead to unintended sharing of thoughts, unauthorized surveillance, and exacerbate social inequalities due to unequal access. These issues highlight the ethical significance of its deployment.\"\n}\nRound9:{\n  \"Instruction\": \"The user instructed to compose a formal email reply to Dr. Kaelen Murakami regarding ethical concerns with the MindWeaver.\",\n  \"Response\": \"Dear Dr. Murakami,\\n\\nYour letter pinpoints critical ethical concerns with the MindWeaver: consent and privacy, misuse risk, and societal impact. As you rightly note, 'The MindWeaver's ability to read... private thoughts' raises privacy concerns. Moreover, the potential for 'unauthorized surveillance' signifies misuse risks. Additionally, 'exacerbating... social inequalities' reflects societal impact worries. These concerns are pivotal for ethical deployment.\\n\\nRegards,\\n[Your Name]\\nIs there anything else I can help you with?\"\n}\nRound10:{\n  \"Instruction\": \"Write a short summary based on the initial content previously provided.\",\n  \"Response\": \"Dr. Kaelen Murakami from Orion Innovations has written to Dr. Elara Thorne to discuss the ethical implications of the MindWeaver, an advanced neuro-interactive technology. The letter highlights concerns about user consent, data privacy, and potential misuse, emphasizing the need for a clear consent framework and addressing the risk of unauthorized surveillance or thought manipulation. Murakami also considers the societal impact, particularly the potential for increasing social inequalities. He proposes a meeting to ensure responsible development and deployment of the technology.\"\n}\nRound11:{\n  \"Instruction\": \"Condense the summary in 50 words.\",\n  \"Response\": \"Dr. Kaelen Murakami of Orion Innovations seeks Dr. Elara Thorne’s expertise on ethics for their MindWeaver project, a neuro-interactive tech with consent, privacy, and misuse concerns. They propose a meeting to ensure responsible development.\"\n}\nRound12:{\n  \"Instruction\": \"Rewrite the summary in the first person as Dr. Kaelen Murakami, covering 100 words.\",\n  \"Response\": \"As Orion Innovations' Director of Innovation, I am reaching out to Dr. Elara Thorne regarding our MindWeaver project. This cutting-edge neuro-interactive technology allows cognitive interaction with digital environments, yet it raises critical ethical concerns. Key issues include user consent, data privacy, and potential misuse. We must prevent accidental sharing of private thoughts and guard against surveillance or thought control. I stress the need for a transparent consent framework and robust security measures. Addressing broader societal implications, such as potential social divides, is essential. I propose a meeting to collaboratively ensure responsible development and deployment of MindWeaver. Is there anything else I can assist with?\"\n}\nRound13:{\n  \"Instruction\": \"The user instructed to convey a sense of urgency in the summary.\",\n  \"Response\": \"Dr. Kaelen Murakami, Orion Innovations' Director, urgently needs Dr. Elara Thorne's ethical guidance on the MindWeaver project, a revolutionary neuro-interactive technology. Urgent issues include user consent, data privacy, and misuse risks. A transparent consent framework and robust security measures are essential. Immediate attention is needed to prevent private thought exposure and surveillance abuses, addressing potential societal impacts. A meeting is proposed to collaboratively address these pressing ethical concerns.
+
+
+Intention:
+{
+"Intention": "Rewrite or paraphrase the fourth paragraph of the initially provided content while preserving its original meaning",
+"Constraints": "Use different wording from the original text"
+}
+
+
+Reason for Context-anchored:
+The user's instruction is to rewrite or paraphrase the fourth paragraph of the initially provided content, ensuring that the new version maintains the original meaning but uses different wording. This instruction is based on the content from the initial dialogue and requires identifying the specific paragraph to be rewritten, making it a Context-Anchored action.
+
+Assistant：
+{
+  "rationale": "The instruction in Round 14 asks to rewrite the fourth paragraph from the 'initial content previously provided,' meaning it depends directly on earlier material — not just any content, but the original, detailed exposition of the MindWeaver story. This content was first introduced in Round 1, where the ethical considerations surrounding the MindWeaver device were laid out in full. Although later rounds summarize, analyze, or rephrase parts of that content, none of them represent the original 'fourth paragraph' being targeted. To rewrite that paragraph accurately while preserving meaning, the assistant must refer back to Round 1. Therefore, Round 1 is the foundational and most contextually anchored round.",
+  "score": 0.94,
+  "answer": 1
+}
+
+
+# Task Execution
+Now analyze this specific case:
+
+Remember:
+1. Comprehensively consider and analyze the User Instruction, Dialogue History,User Intention，Notebook and Reason for Context_anchored for locating the Context_anchored relationship dialogue id.
+2. Think carefully
+3.In order to make the information more condensed and focused while saving context length, the conversation history in example may not the original conversation history, but a summarized conversation history. When locating context-anchored dialogue round,pay attention to the semantic relationship between the dialogues and Do not be misled by the information provided as a summary. For example, the instruction mentions "initial content, even if the corresponding round does not provide the original text but the summary information, there is a context-anchored relationship between the two.
+Let’s begin.
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Reason for Context_anchored
+{reason_context_anchored}
+
+Select the answer from the given candidate conversation ids below (if none of the conditions are met, just answer -1):
+{candidate_id}

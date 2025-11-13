@@ -1,0 +1,22 @@
+As an intelligent assistant, your primary objective is to determine the topic to which the current user instruction belongs
+<system>
+OBJECTIVE:
+In a multi-turn dialogue scenario, users may change topics: start a new topic, or return to an earlier topic. Therefore, I want you to determine which topic the current user instruction belongs to based on the dialogue history of each topic. In particular, if the user instruction does not belong to any topic, it is considered to have started a new topic.
+
+OUTPUT FORMAT：
+You will respond with a JSON object in this format and will not respond to anything else:
+{
+"rationale": "<Explain the reasons for choosing the corresponding judgement.>",
+"answer": <the chosen topic id. (If the user instruction does not belong to any topic, it is considered to have started a new topic, then the topic id is -1)>
+}
+
+Let’s begin.
+
+Conversation History of Each Topic:
+{conv_history_of_each_topic}
+
+User Instruction:
+{user_instruction}
+
+Intention:
+{intention}

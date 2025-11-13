@@ -1,0 +1,164 @@
+As an expert dialogue analyzer, your task is to identify the specific historical dialogue round that has a logical Context_anchored relation with the current user instruction. Follow these guidelines precisely:
+<system>
+OBJECTIVE:
+Analyze the Extracted Information and User Instruction, and locate the dialogue round that (1) is not in the Extracted Information and (2) have a logical Context_anchored relation with the User Instruction from the dialogue history.
+
+ANALYSIS:
+We have extracted some information during the previous steps, which contains the dialogue rounds that have a specific semantic relation with the current user instruction. The current task is to exclude the dialogue rounds that have appeared in the Extracted Information and find other dialogue round that satisfys the Context_anchored relation from the dialogue history.
+
+#Core Definition  
+A Context-Anchored relationship exists ONLY when:  
+1. Anchor Requirement:  
+   The current instruction semantically relies on, directly utilizes, or logically connects to specific content from a historical round (either user input or assistant response)  
+
+   Includes both overt citations (e.g., "as mentioned in Round 2") and covert dependencies (e.g., "based on that content")  
+
+2. Dependency Principle:  
+   The instruction fundamentally requires the referenced context for coherent interpretation or valid response generation  
+
+   Either reconstructs key elements from history or builds logical arguments upon them  
+
+3. Root Condition:  
+   When multiple historical references are possible, identify the most foundational anchoring point (Exception: If it appears in the list Extracted conversation id, you cannot select it and must answer a new id) 
+
+   The dependency must be more essential than superficial mentions or tangential connections  
+
+# Critical Constraints  
+   If no round meets both requirements, return answer: -1  
+   Never invent references that don't exist  
+   Never combine information across multiple turns  
+   MOST IMPORTANT: The dialogue turn targeted by this response must not appear in the Extracted Information (otherwise it would be meaningless). To achieve this goal, I will explicitly tell you all the candidate ids excluding the extracted ids, and your answer should be generated from the candidate ids.
+
+
+# Output Format
+Return ONLY this JSON structure:
+
+{
+  "rationale": "<Technical explanation of how the chosen turn satisfies the Context_anchored relation>",
+  "score":<Confidence score, which measures the confidence level of choosing the current dialogue turn>,
+  "answer": <turn_id_or_-1>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+Remember:
+1. Comprehensively consider and analyze the User Instruction, Dialogue History,User Intention，Notebook and Reason for Context_anchored for locating the Context_anchored relation dialogue id.
+2. Think carefully
+3. Extracted conversation id is the ID number of all conversations whose corresponding relation has been identified (if it is [], it means that no information has been identified yet). In order to prevent you from answering incorrectly, I extracted the candidate conversation ids for you. The output must ensure that: it must be the id in candidate conversation ids.
+
+# Demonstration Examples
+Due to the context length limit, the dialogue history is compressed into a summary sentence here, which does not affect the judgment of semantic relations.
+
+**Example 1 - Valid Implicit Anchor**
+Instruction: List them in the order they appear in the context.
+（Current Instruction: Round 11）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1: (The following is a summary, not the original text)
+           Instruction: Gave a long story titled "Voyage to the Whispering Woods of Aralia"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+(Omitted the middle dialogue)
+- Round 10：Instruction: "List all the persons and places in the initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Place: ..., ...'."
+            Response: Person: Faelan; Place: Aralia, Whispering Woods of Aralia, Crystal Clearing, Moonlit Banquet, Mirror Lake. Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Identify the referent of the pronoun 'them' in the instruction, locate the corresponding items in the provided context, and list those items in the order in which they appear",
+"Constraints": "None"
+}
+
+Notebook:
+Related content that has been identified：
+The context on which the instruction is based (Context_anchored relationship):
+- Round 1: (The following is a summary, not the original text)
+           Instruction: Gave a long story titled "Voyage to the Whispering Woods of Aralia"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+
+Reason for Context-anchored:
+The current action is to determine what 'them' refers to in the instruction by examining the conversation history. While the Notebook has already identified the foundational context (Round 1's story content), the instruction requires identifying the specific elements that 'them' points to in order to list them in order. This necessitates anchoring to the most recent relevant content (Round 10's list of persons and places) to properly interpret and execute the instruction.
+
+Extracted conversation id：
+[1]
+
+Candidate ids：
+[0,2,3,4,5,6,7,8,9,10]
+
+Assistant：
+{
+"rationale": "The current user instruction requires identifying the referent of the pronoun 'them' and listing the referenced items in order of appearance from the prior content. Round 10 provides a detailed, categorized list of persons and places—'Person: Faelan; Place: Aralia, Whispering Woods of Aralia, Crystal Clearing, Moonlit Banquet, Mirror Lake'—which is exactly what 'them' refers to. The instruction cannot be coherently executed without referencing this list. Although Round 1 provides the foundational narrative context, it has already been extracted, and Round 10 serves as the next essential anchoring point to resolve the referent and fulfill the instruction. It directly supports interpretation and ordering of the items.",
+"score": 0.9,
+"answer": 10
+}
+
+
+**Example 2 - Unable to find new Anchor**
+Instruction: List all the people in the initial content previously provided. Your answers should be separated by commas. Do not include any further explanations or extra output in your response.
+（Current Instruction: Round 2）
+
+History:
+- Round 0: Instruction：All subsequent responses end with “Is there anything else I can help you with?
+           Response：OK\n\n
+- Round 1: Instruction: Gave a long story titled "The Inaugural Hoverball World Championship in Lumina City"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+
+Intention:
+{
+"Intention": "Identify and list all person names mentioned in the initially provided content",
+"Constraints": "Names should be separated by commas; no additional explanations or extra output should be included"
+}
+
+Notebook:
+Related content that has been identified：
+The context on which the instruction is based (Context_anchored relationship):
+- Round 1: Instruction: Gave a long story titled "The Inaugural Hoverball World Championship in Lumina City"
+           Response：A brief summary of the story + Is there anything else I can help you with?
+
+Reason for Context-anchored:
+The current action is to locate the 'initial content' referred to in the instruction by reviewing the conversation history. The instruction explicitly asks to list all the people found in the initial content, indicating that the assistant must first identify and anchor to this specific context from the history before proceeding. Therefore, the first action is to identify the context that the instruction is anchored to.
+
+Extracted conversation id：
+[1]
+
+Candidate ids：
+[0]
+
+Assistant：
+{
+  "rationale": "The current instruction asks the assistant to list all people from the 'initial content previously provided'. The content referred to (a story titled 'The Inaugural Hoverball World Championship in Lumina City') has already been identified and extracted as being from Round 1. Since that round is already listed in the Extracted Information, and the only remaining candidate (Round 0) merely sets a stylistic constraint without contributing any content or context needed to interpret the instruction, there is no other round in the candidate list that meets the Context_anchored relationship definition.",
+  "score": 1.0,
+  "answer": -1
+}
+
+# Task Execution
+**Attention**
+In order to make the information more condensed and focused while saving context length, the dialogue history in example may not the original dialogue history, but a summarized dialogue history. When locating context-anchored dialogue turn,pay attention to the semantic relation between the dialogues and do not be misled by the information provided as a summary. For example, the instruction mentions "initial content, even if the corresponding turn does not provide the original text but the summary information, there is a context-anchored relation between the two.
+
+Now analyze this specific case:
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Notebook:
+{notebook}
+
+Reason for Context_anchored
+{reason_context_anchored}
+
+Extracted conversation id：
+{id_list}
+(answer cannot be the id in Extracted conversation id)
+
+Select the answer from the given candidate conversation ids below (if none of the conditions are met, just answer -1):
+{candidate_id}

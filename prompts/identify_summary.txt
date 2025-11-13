@@ -1,0 +1,135 @@
+As an expert dialogue analyzer, your task is to identify the specific historical dialogue turn(s) that has a logical summary relation with the current user instruction. Follow these guidelines precisely:
+<system>
+#Core Definition  
+**A Summary relationship exists ONLY when:**
+1. **Summarization Requirement:**
+   The current instruction explicitly or implicitly requests a summary of specific historical turn(s) in the dialogue history
+   
+   Includes explicit summarization requests (e.g., "summarize our previous discussion") and implicit summary needs (e.g., "what are the main points we covered?")
+
+2. **Condensation Principle:**
+   The instruction must aim to extract, distill, or consolidate key information from the referenced content
+   
+   Either seeks to compress multiple exchanges into essential points or requests an overview of previously discussed topics
+
+3. **Specificity Condition:**
+   Because Instruction may request summary for multiple turns (example:give a summary for all the historical conversations), in this case, all relevant conversation turns have a Summary relation with the current user instruction.
+   
+   The summarization scope must be more targeted than general conversation review or mere information retrieval
+
+# Critical Constraints  
+ If no turn meets both requirements, return answer: [-1]  
+ Never invent references that don't exist   
+ You cannot select yourself as the answer. 
+
+Remember:
+1. Comprehensively consider and analyze the User Instruction, Dialogue History,User Intention，Notebook and Reason for Summary for locating the Context_anchored relationship dialogue id.
+2. Think carefully
+3. Closely combine the context information in the conversation history for analysis
+
+# Output Format
+Return ONLY this JSON structure:
+
+{
+  "rationale": "<Technical explanation of how the chosen turn(s) satisfies the Summary relation>",
+  "score":<Confidence score, which measures the confidence level of choosing the current dialogue turn(s)>,
+  "answer": <a list of all conversation ids that meet the conditions,If no conversation mets the requirements, it is [-1]>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+# Demonstration Examples
+Due to the context length limit, the conversation history is compressed into a summary sentence here, which does not affect the judgment of semantic relationships.
+
+**Example 1 - Summarize a single conversation turn**
+Summarize the analysis in the last question in 3 sentences.
+（Current Instruction: Round 10）
+
+History:
+Below is a summary version of the conversation history:
+Round0 gives a story about physics.
+Round1 asks "In that physics story, how did the scientist overcome the difficulties in the experiment? And make sure to include the keyword 'electromagnetic interference' in the answer.",Then llm gives the answer.
+Round2 asks "Answer the last question step by step with more details about the scientist's actions. Write in a narrative style, that's a style constraint. Also, make it at least 200 words.",Then llm gives the answer.
+Round3 asks "What are the potential impacts of this experiment result in the real - world physics field? Answer from the perspective of a senior physics researcher, that's a situation constraint. And don't use any overly technical jargon.",Then llm gives the answer.
+Round4 asks "All following answers must start with the letter 'P'".,Then llm gives the answer.
+Round5 asks "List the entities in the physics story. Include characters, objects, and events. And the answer should be in simple language.",Then llm gives the answer.
+Round6 asks "List the entities in the physics story in alphabetical order. Also, limit the answer to 150 words.",Then llm gives the answer.
+Round7 asks "Which of these entities played the most important role in the story? And answer in a way that a non - physicist can understand.",Then llm gives the answer.
+Round8 asks "How does the experiment in the physics story relate to the entity list? Answer from the perspective of someone just starting to learn physics.",Then llm gives the answer.
+Round9 asks ""Analyze the relationship in the last question from multiple physical perspectives. And use simple and easy - to - understand language, a style constraint. Also, make it at least 250 words.",Then llm gives the answer.
+
+Intention:
+{
+"Intention": "Summarize the analysis from the last question into a concise format",
+"Constraints": "The summary should be limited to 3 sentences"
+}
+
+Reason for Summary:
+The user's instruction explicitly asks for a summary of the analysis from the last question, making it clear that the task is to summarize previous content. This requires gathering relevant parts of the conversation and condensing them, which fits the definition of the Identify_Summary action.
+
+Assistant：
+{
+"rationale": "The user's instruction explicitly requests a summary of the analysis from the last question, focusing on condensing the content into a concise format. This request aligns with the criteria for a Summary relationship, as it seeks to distill key points from a specific part of the conversation, namely the analysis in the previous question. Therefore, the relevant round for this summary is Round 9, where the analysis was provided. This fits the requirement for summarization.",
+"score": 0.95,
+"answer": [9]
+}
+
+
+
+**Example 2 - Summary of multiple rounds of conversations**
+Instruction: Summarize the whole psychology - related conversation, including the story, questions, and answers. Make it no more than 300 words.
+（Current Instruction: Round 23）
+
+History:
+Below is a summary version of the conversation history:
+Round0 gives a story about physics.
+(Round0-Round12 are about physics,so it's omitted here.)
+Round13 gives a story about psychology.
+Round14 asks "In the psychology story, how did the person deal with the psychological stress? Include the keyword 'positive self - talk' in the answer.",Then llm gives the answer.
+Round15 asks "What are the long - term effects of this way of dealing with stress? Answer as if you're a psychology student doing a presentation.",Then llm gives the answer.
+Round16 asks "All following answers must include the keywords 'empathy' and 'cognition'.",Then llm gives the answer.
+Round17 asks "List the entities in the psychology story. Include characters, psychological concepts, and events. And make the answer no more than 150 words.",Then llm gives the answer.
+Round18 asks "Which of these entities are most closely related to the concept of empathy? Answer in a simple and straightforward way.",Then llm gives the answer.
+Round19 asks "Describe how the empathy - related entities interact with each other in the story. And use a narrative style, a style constraint. Also, make it at least 200 words.",Then llm gives the answer.
+Round20 asks "How does the interaction of these entities affect the character's cognition in the story? Answer from the perspective of a psychology enthusiast.",Then llm gives the answer.
+Round21 asks "How does the overall story support the interaction analysis in the last question? Answer in a clear and organized way.",Then llm gives the answer.
+Round22 asks "What are the practical psychological implications of this relationship in real life? Answer without using too many technical terms.",Then llm gives the answer.
+
+Intention:
+{
+"Intention": "Summarize the entire psychology-related conversation, including the story, questions, and answers",
+"Constraints": "The summary should not exceed 300 words"
+}
+
+Reason for Summary:
+The user's instruction requests a summary of the entire psychology-related conversation, including a range of topics from the story to specific questions and answers. This requires gathering and synthesizing relevant parts of the conversation into a cohesive summary, which fits the Identify_Summary action. The summary is expected to be concise and focused on the psychology-related content.
+
+Assistant：
+{
+"rationale": "The user's instruction explicitly asks for a summary of the entire psychology-related conversation, which includes both the story and subsequent questions and answers. This fits the criteria for a summary relationship as it requires the assistant to distill key points and consolidate multiple rounds into a concise overview. The relevant rounds in this case span from Round 13 to Round 22, as they focus on the psychology story and related analysis.",
+"score": 0.95,
+"answer": [13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+}
+
+# Task Execution
+
+Now analyze this specific case:
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Reason for Summary
+{reason_summary}
+
+Select the answer from the given candidate conversation ids below (if none of the conditions are met, just answer [-1]):
+{candidate_id}

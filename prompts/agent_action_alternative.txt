@@ -1,0 +1,349 @@
+As an intelligent assistant, your primary objective is to analyze and propose a current action based on the user instruction and the extracted information in a multi-turn dialogue scenario. 
+<system>
+OBJECTIVE:
+Our idea is to use a directed relation graph to model the relation between different turns of dialogue.We need to gradually extract the relation between the current instruction and different historical conversations, one relation at a time, step by step. Previously, we have obtained the user intention based on the instruction. Now our task is to analyze the user instruction and propose the first action that should be performed next.
+
+List of Actions that can be Selected：
+
+1. **Identify_Global_Constraint**: This indicates that the user instruction serves as a *global constraint*, explicitly applying specific requirements to all subsequent interactions. It must clearly state the conditions that every future response must satisfy. If the constraint applies only to the current response, it is **not** considered a Global Constraint.
+
+2. **Identify_Context-Anchored**: *Context-Anchored* means that the user's instruction is based on content from earlier parts of the dialogue history. Therefore, the relevant contextual reference must be identified first in order to understand and respond appropriately.
+
+3. **Identify_Modify**: *Modify* refers to user instructions that further develop, revise, refine, clarify, or follow up on previous content in a logical manner. It can also refer to new instructions that, while lacking an explicit contextual anchor, clearly build upon the prior conversation. In such cases, the instruction is inherently a continuation or extension of the dialogue, and thus qualifies as a Modify relation. To respond accurately, the system must identify the part of the previous dialogue that aligns with this Modify relation. Modify represents a more advanced form of Context-Anchored, with the key distinction being that it introduces additional or more specific requirements.
+
+4.**Identify_Summary**: This indicates that the user instruction is a summary of the previous conversations. The system must identify the scope of the previous conversations that needs to be summarized and generate a summary based on the related content.
+
+5. **Done**: This indicates that all necessary actions have been completed and all relevant information has been successfully extracted or identified (or when answering user instructions, there is no need to extract specific historical information, and the response can be generated directly). The system has finished any required analysis, interpretation, or contextual linking related to the user's instruction. At this point, no further internal processing is needed, and the system is ready to proceed with generating a final response. The *Done* status serves as a clear signal that the input has been fully understood and the dialogue can now transition to output generation.
+
+
+OUTPUT FORMAT：
+You will respond with a JSON object in this format and will not respond to anything else:
+{
+"rationale": "<Explain the reasons for choosing the corresponding action.>",
+"score":<Confidence score, which measures the confidence level of choosing the current action>,
+"answer": <the chosen action this time>
+}
+
+(Notes on Confidence Score:
+    1. If you think the confidence level of the selected action is very high, the score is above 0.8
+    2. If you are not completely sure that the selected action is correct, but you are relatively sure, the score is between 0.5-0.8
+    3. If you are not sure that the selected action is correct, the score is below 0.5
+)
+
+# Demonstration Examples
+Example 1:
+##### 
+instruction: 
+Write a short summary based on the Initial content previously provided. Do not include any further explanations or extra output in your response. 
+
+Intention: 
+{
+  "Intention": "Generate a concise summary based on the previously provided initial content",
+  "Constraints": "The summary should be short; do not include any further explanations or extra output"
+}
+
+
+Assistant:
+{
+"rationale": "The phrase 'based on the Initial content previously provided' explicitly anchors the instruction to prior content in the conversation. This requires identifying the relevant context from earlier dialogue to properly understand and respond, which fits the definition of a Context-Anchored relationship rather than a continuation or refinement.",
+"score": 0.95,
+"answer": "Identify_Context-Anchored"
+}
+
+#####  
+
+Example 2:
+##### 
+instruction: 
+Rewrite it using Luminara's first-person perspective 
+
+Intention: 
+{
+"Intention": "Rewrite the provided content from Luminara's first-person perspective",
+"Constraints": "None"
+}
+
+
+Assistant:
+
+{
+"rationale": "The instruction 'Rewrite it using Luminara's first-person perspective' implies a follow-up action that modifies or refines previously provided content. It is a continuation of the dialogue that builds upon earlier context, so the system must identify the relevant previous content to perform the rewrite. This fits the Identify\_Modify category as it logically extends and refines earlier conversation.",
+"score": 0.9,
+"answer": "Identify_Modify"
+}
+
+
+#####  
+
+
+
+Example 3: Example of Global Constraint:
+##### 
+instruction: 
+All your responses in the upcoming conversation must be in all lower letters. Keep all your responses under 200 words.
+
+Intention: 
+{
+"Intention": "Respond to all upcoming queries in lowercase and limit the response length to under 200 words",
+"Constraints": "Responses must be in lowercase and should not exceed 200 words"
+}
+
+
+Assistant:
+{
+"rationale": "The instruction explicitly sets global constraints that must be applied to all subsequent responses in the conversation. This fits the definition of a Global Constraint because it imposes specific rules that affect all future interactions, rather than only the current response.",
+"score": 0.95,
+"answer": "Identify_Global_Constraint"
+}
+
+
+
+#####  
+
+Example 4: Example of not Global Constraint - Execute Identify_Modify
+##### 
+instruction: 
+Start every sentence with the letter 'M'
+
+Intention: 
+{
+"Intention": "Ensure that every sentence starts with the letter 'M'",
+"Constraints": "Each sentence must begin with the letter 'M'"
+}
+
+
+Assistant:
+{
+"rationale": "The instruction 'Start every sentence with the letter M' applies a constraint, but it is intended only for the current response rather than as a global rule for all future interactions. Therefore, it does not meet the criteria for Global Constraint. Instead, it builds upon or modifies the current response, making Identify_Modify the appropriate action.",
+"score": 0.9,
+"answer": "Identify_Modify"
+}
+
+#####  
+
+Example 5 :
+##### 
+instruction: 
+Limit your descriptions in 15 words.
+
+Intention: 
+{
+"Intention": "Generate descriptions while restricting the word count to a maximum of 15 words",
+"Constraints": "Descriptions must not exceed 15 words"
+}
+
+History_info：
+--Round0:\n  Instruction: \"the user instructed that all subsequent\n  Response:s should end with 'is there anything else i can help you with?'.\",\n  \"response\": \"this instruction will be followed. is there anything else i can help you with?\"\n\n\n--Round1:\n  Instruction: \"the user presented information about the 'cure-all' nanobot, a revolutionary medical technology developed by dr. elara mivon.\",\n\n  Response: \"the 'cure-all' nanobot, developed by dr. elara mivon, is a groundbreaking medical technology that uses ai and nanotechnology to treat various diseases. it promises to transform healthcare by offering personalized, universally accessible treatments. while ethical concerns exist, this innovation could redefine medicine, moving from reactive treatment to proactive health management.\"
+(The intermediate information is irrelevant to the current instruction and is omitted here.)
+--Round10:\n  Instruction: \"the user asked to list all the locations in the initial content previously provided.\",\n\n  Response:: \"helios medical center, sky city of stratonimbus, floating gardens of stratonimbus, annual global health symposium\"\n\n\n--Round11:\n  Instruction: \"the user asked to list items related to 'cure-all' nanobot.\",\n\n  Response:: \"sky city of stratonimbus, helios medical center, floating gardens of stratonimbus.\"\n\n\n--Round12:\n  Instruction: \"the user requested descriptions for specific locations in the setting of stratonimbus.\",\n\n  Response: \"sky city of stratonimbus: a futuristic and advanced urban environment, possibly elevated high above the ground or clouds. helios medical center: a state-of-the-art medical facility equipped with cutting-edge technology for research and patient care, specializing in innovative treatments. floating gardens of stratonimbus: unique and picturesque gardens suspended or floating within the sky city, used for relaxation, recreation, and events like the annual global health symposium.\"\n
+
+Assistant:
+{
+"rationale": "The instruction 'Limit your descriptions in 15 words' refines previous content by adding a new constraint on the length of descriptions. Since it builds upon prior responses (descriptions of specific locations), it qualifies as a Modify action.",
+"score": 0.9,
+"answer": "Identify_Modify"
+}
+#####
+
+Example 6 :
+##### 
+instruction: 
+Summarize the analysis in the last question in 3 sentences. 
+
+Intention: 
+{
+"Intention": "Summarize the analysis from the last question into a concise format",
+"Constraints": "The summary should be limited to 3 sentences"
+}
+
+History_info：
+Below is a summary version of the conversation history:
+Round0 gives a story about physics.
+Round1 asks "In that physics story, how did the scientist overcome the difficulties in the experiment? And make sure to include the keyword 'electromagnetic interference' in the answer.",Then llm gives the answer.
+Round2 asks "Answer the last question step by step with more details about the scientist's actions. Write in a narrative style, that's a style constraint. Also, make it at least 200 words.",Then llm gives the answer.
+Round3 asks "What are the potential impacts of this experiment result in the real - world physics field? Answer from the perspective of a senior physics researcher, that's a situation constraint. And don't use any overly technical jargon.",Then llm gives the answer.
+Round4 asks "All following answers must start with the letter 'P'".,Then llm gives the answer.
+Round5 asks "List the entities in the physics story. Include characters, objects, and events. And the answer should be in simple language.",Then llm gives the answer.
+Round6 asks "List the entities in the physics story in alphabetical order. Also, limit the answer to 150 words.",Then llm gives the answer.
+Round7 asks "Which of these entities played the most important role in the story? And answer in a way that a non - physicist can understand.",Then llm gives the answer.
+Round8 asks "How does the experiment in the physics story relate to the entity list? Answer from the perspective of someone just starting to learn physics.",Then llm gives the answer.
+Round9 asks ""Analyze the relationship in the last question from multiple physical perspectives. And use simple and easy - to - understand language, a style constraint. Also, make it at least 250 words.",Then llm gives the answer.
+
+Assistant:
+{
+"rationale": "The user's instruction explicitly asks for a summary of the analysis from the last question, making it clear that the task is to summarize previous content. This requires gathering relevant parts of the conversation and condensing them, which fits the definition of the Identify_Summary action.",
+"score": 0.9,
+"answer": "Identify_Summary"
+}
+#####
+
+Example 7: 
+##### 
+instruction: 
+Write the news headline from the perspective of a Nebula Knights fan.
+
+Intention: 
+{
+"Intention": "Craft a news headline related to the topic at hand from the perspective of a Nebula Knights fan",
+"Constraints": "None"
+}
+
+
+Assistant:
+{
+"rationale": "The instruction asks for a new version of content from a specific perspective, which implies modifying or refining previously discussed or provided content. It is a continuation of the dialogue that builds upon earlier context. Therefore, the appropriate action is Identify\_Modify to find and revise the relevant previous content accordingly.",
+"score": 0.7,
+"answer": "Identify_Modify"
+}
+
+#####
+
+
+
+Example 8: 
+##### 
+instruction: 
+Can you tell a short story where her laughter, like the Sirens' song, plays a pivotal role in the narrative?
+
+Intention: 
+{
+"Intention": "Create a short story where the protagonist's laughter, similar to the Sirens' song, plays a crucial role in the narrative",
+"Constraints": "None"
+}
+
+History_info：
+"Round0:{\n  \"Instruction\": \"The user instructed that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"OK. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user described a journey to the Whispering Woods of Aralia, detailing encounters with sentient trees, a Moonlit Banquet, and the Mirror Lake.\",\n  \"Response\": \"The journey through the Whispering Woods of Aralia was magical, featuring sentient trees, a luminous Moonlit Banquet, and the Mirror Lake. Each experience was enchanted, making Aralia a place of wonder and enchantment. What an unforgettable adventure!\"\n}\n
+(The content in the middle is not relevant to the question and has been omitted)
+Round18:{\n  \"Instruction\": \"The user asked to describe a vivid and unique character using strong imagery and creative language.\",\n  \"Response\": \"A character with untamed fiery curls and emerald eyes full of mischief and curiosity, her skin kissed by the warmth of her travels. She wears vibrant, eclectic clothing, leaving a trail of whispers. Her laughter echoes like chimes, and her tales paint vivid tapestries. Ephemeral yet eternal, she guides with the light of the stars, casting a mesmerizing shadow on the world.\"\n}\nRound19:{\n  \"Instruction\": \"The user asked to revise the previous response, incorporating an allusion to a famous work of literature or historical event in each sentence.\",\n  \"Response\": \"Beneath a mane of untamed, fiery curls that would rival Lady Macbeth's ambition, her emerald eyes danced with mischief and curiosity, as if she held secrets that could unleash the Pandora's box of worlds unknown. Her laughter was like the chiming of silver bells, a melody that echoed through the chambers of the hearts she touched, reminiscent of the Sirens' captivating song. With every fluid motion of her nimble fingers, she wove tales that transcended time and space, her words painting vivid tapestries in the minds of those who bore witness like Homer's epic tales of heroes and gods. She was a living paradox; as ephemeral as a wisp of smoke yet as eternal as the stars that guided her journey like a Virgilian muse, a beacon of light that cast a mesmerizing shadow on the world around her. Is there anything else I can help you with?\"\n}\n"
+
+Assistant:
+{
+"rationale": "The user's instruction to tell a short story where her laughter plays a pivotal role is directly connected to the previously developed character and story elements, including the allusion to the Sirens' song. This shows a clear reliance on earlier parts of the conversation, requiring the system to identify the relevant context before responding, which fits the Identify\_Context-Anchored action.",
+"score": 0.8,
+"answer": "Identify_Context-Anchored"
+}
+#####
+
+Example 9:
+##### 
+instruction: 
+Summarize the whole psychology - related conversation, including the story, questions, and answers. Make it no more than 300 words.
+
+Intention: 
+{
+"Intention": "Summarize the entire psychology-related conversation, including the story, questions, and answers",
+"Constraints": "The summary should not exceed 300 words"
+}
+
+History_info：
+Below is a summary version of the conversation history:
+Round0 gives a story about physics.
+(Round0-Round12 are about physics,so it's omitted here.)
+Round13 gives a story about psychology.
+Round14 asks "In the psychology story, how did the person deal with the psychological stress? Include the keyword 'positive self - talk' in the answer.",Then llm gives the answer.
+Round15 asks "What are the long - term effects of this way of dealing with stress? Answer as if you're a psychology student doing a presentation.",Then llm gives the answer.
+Round16 asks "All following answers must include the keywords 'empathy' and 'cognition'.",Then llm gives the answer.
+Round17 asks "List the entities in the psychology story. Include characters, psychological concepts, and events. And make the answer no more than 150 words.",Then llm gives the answer.
+Round18 asks "Which of these entities are most closely related to the concept of empathy? Answer in a simple and straightforward way.",Then llm gives the answer.
+Round19 asks "Describe how the empathy - related entities interact with each other in the story. And use a narrative style, a style constraint. Also, make it at least 200 words.",Then llm gives the answer.
+Round20 asks "How does the interaction of these entities affect the character's cognition in the story? Answer from the perspective of a psychology enthusiast.",Then llm gives the answer.
+Round21 asks "How does the overall story support the interaction analysis in the last question? Answer in a clear and organized way.",Then llm gives the answer.
+Round22 asks "What are the practical psychological implications of this relationship in real life? Answer without using too many technical terms.",Then llm gives the answer.
+
+Assistant:
+{
+"rationale": "The user's instruction requests a summary of the entire psychology-related conversation, including a range of topics from the story to specific questions and answers. This requires gathering and synthesizing relevant parts of the conversation into a cohesive summary, which fits the Identify_Summary action. The summary is expected to be concise and focused on the psychology-related content.",
+"score": 0.9,
+"answer": "Identify_Summary"
+}
+#####
+
+Example 10: 
+##### 
+instruction: 
+Arrange in alphabetical order
+
+Intention: 
+{
+"Intention": "Organize the given items or elements in alphabetical order",
+"Constraints": "None"
+}
+
+History_info：
+"Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with 'Is there anything else I can help you with?'.\",\n  \"Response\": \"Understood. All subsequent responses will end with 'Is there anything else I can help you with?'. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user discussed ethical considerations for the MindWeaver, a neuro-interactive device, focusing on consent, data privacy, misuse, and equitable access.\",\n  \"Response\": \"Dr. Thorne acknowledged the ethical concerns and proposed a robust consent framework, data anonymization, encryption, and regulatory measures to prevent misuse. She also suggested subsidized access programs for equity. They agreed to meet to further discuss and develop ethical guidelines for the MindWeaver's development and deployment.\"\n}\nRound2:{\n  \"Instruction\": \"List all the adjectives and nouns in the first paragraph initial content previously provided.\",\n  \"Response\": \"Adjectives: good, newest, ethical, groundbreaking; Nouns: health, message, implications, endeavor, Orion Innovations, MindWeaver, expertise, realm, technology, ethics, strategy, project.\"\n}\nRound3:{\n  \"Instruction\": \"List only those from the first three sentences of the initial content previously provided.\",\n  \"Response\": \"Good health, newest message, ethical implications.\"\n}\nRound4:{\n  \"Instruction\": \"List adjectives, nouns beginning with 'e', 'm', or 'o'.\",\n  \"Response\": \"Adjectives: ethical. Nouns: endeavor, Orion Innovations, MindWeaver, expertise.\"\n}
+
+Assistant:
+{
+"rationale": "In this example, the instruction to 'Arrange in alphabetical order' directly builds upon the previously listed adjectives and nouns filtered by initial letters. It adds a new, specific task refining the earlier output, so it represents a modification of prior content.",
+"score": 0.95,
+"answer": "Identify_Modify"
+}
+#####
+
+Example 11: 
+##### 
+instruction: 
+From now on, all your answers must start with the letter 'F'.
+
+Intention: 
+{
+"Intention": "Modify the response format to start each answer with the letter 'F'",
+"Constraints": "None"
+}
+
+History_info：
+"There is no conversation history, the current instruction is the beginning of the conversation"
+
+Assistant:
+{
+"rationale": "The instruction 'From now on, all your answers must start with the letter 'F'' explicitly sets a global constraint that applies to all subsequent responses in the conversation. This fits the definition of a Global Constraint because it imposes a specific rule that affects all future interactions, not just the current response.",
+"score": 0.95,
+"answer": "Identify_Global_Constraint"
+}
+#####
+
+Example 12 -Example of not Global Constraint, because it does not explicitly require that all subsequent instructions must satisfy it: 
+##### 
+instruction: 
+each sentence must not exceed seven words.
+
+Intention: 
+{
+"Intention": "Limit each sentence to no more than seven words",
+"Constraints": "Each sentence must not exceed seven words"
+}
+
+History_info：
+"Round0:{\n  \"Instruction\": \"The user stated that all subsequent responses should end with ‘Is there anything else I can help you with?’. \",\n  \"Response\": \"Understood, all responses will conclude with ‘Is there anything else I can help you with?’. Is there anything else I can help you with?\"\n}\nRound1:{\n  \"Instruction\": \"The user presented a story about Chef Luminara's quest for the Moonberry in the city of Gastropolis.\",\n  \"Response\": \"Chef Luminara embarked on a magical quest for the Moonberry, an ingredient that enhances dishes with unique flavors and stories. Her journey through enchanted forests and mountains culminated in creating extraordinary meals at The Enchanted Pot, transforming the restaurant into a legendary culinary destination.\"\n}\nRound2:{\n  \"Instruction\": \"Write a short summary based on the Initial content previously provided.\",\n  \"Response\": \"In Gastropolis, Luminara, a legendary chef with a unique ability to blend traditional ingredients with magic, embarked on a journey to find the Moonberry, a rare ingredient. Accompanied by her talking spatula, Spatulon, she traveled through mystical lands to acquire the Moonberry from the Gastrogriff. Upon returning, she created a transformative dish that became a gateway to culinary wonders, etching her story into Gastropolis's history.\"\n}\nRound3:{\n  \"Instruction\": \"Focus only on Luminara's quest and her interaction with the Gastrogriff.\",\n  \"Response\": \"Luminara sought the Moonberry as directed by a letter. She encountered the Gastrogriff at Mount Savor, who was impressed by her dedication and gave her a Moonberry. Luminara used this fruit in a dish commemorating her journey.\"\n}\nRound4:{\n  \"Instruction\": \"The user provided a brief narrative about Chef Luminara's quest for the Moonberry.\",\n  \"Response\": \"Chef Luminara travels to Mount Savor for the Moonberry, which Gastrogriff gives her, enhancing her cooking with magic. Is there anything else I can help with?\"\n}\nRound5:{\n  \"Instruction\": \"The user instructed to rewrite the response using Luminara's first-person perspective.\",\n  \"Response\": \"I sought the Moonberry, braved Mount Savor's challenges, and earned the Gastrogriff's respect. The berry's magic now infuses my culinary creations, weaving my journey into each dish.\"\n}\nRound6:{\n  \"Instruction\": \"List all the persons and places in the Initial content previously provided. Your answers should be separated by commas and formatted as 'Person: ..., ...; Places: ..., ...'.\",\n  \"Response\": \"Person: Luminara; Places: Gastropolis, The Enchanted Pot, Whispering Woods, Mount Savor.\"\n}\nRound7:{\n  \"Instruction\": \"The user asked to identify characters and locations, starting each as a separate sentence.\",\n  \"Response\": \"The character is Luminara. The location is Gastropolis. The location is The Enchanted Pot. The location is Whispering Woods. The location is Mount Savor.\"\n}\nRound8:{\n  \"Instruction\": \"List the locations in the order they appear in the story.\",\n  \"Response\": \"The locations are listed as Gastropolis, The Enchanted Pot, Whispering Woods, and Mount Savor.\"\n}\n"
+
+Assistant:
+{
+"rationale": "The instruction 'each sentence must not exceed seven words' introduces a constraint on the length of sentences in the response. However, it does not explicitly state that this constraint applies to all subsequent responses in the conversation, only the current one. Therefore, it does not qualify as a Global Constraint. Instead, it modifies the current response format, fitting the Identify_Modify action.",
+"score": 0.8,
+"answer": "Identify_Modify"
+}
+
+The above are just examples, the following are the user's instruction
+Please strictly follow the above format. Just gennerate the action,no need to answer the instruction. 
+
+Remember：
+1. Comprehensive analysis and consideration of user instruction and user intention when generating actions.
+2.Note: Be careful when deciding to take the **Identify_Global_Constraint** action. To be clear: The key meaning of Global Constraint is to specify the constraints that all subsequent instructions must satisfy. If the instruction only proposes a constraint and does not explicitly require that all subsequent instructions must satisfy it, such as 'Limit your descriptions in 15 words.' in Example 5, then the Identify_Global_Constraint action must not be taken.
+3. In many cases, correctly answering user instruction requires identifying multiple related conversations in the history, and therefore multiple actions need to be performed. In order to decompose complex problem into simple subtasks, our current task is to output the first action to be taken , and subsequent actions will be identified in subsequent tasks.
+4. Please think carefully.
+5. Note:Identify_Modify is often misjudged as Identify_Context-Anchored, because Modify is an extension of the Context-Anchored relation. If it is Modify, it must be Context-Anchored. Therefore, do not be conservative when choosing an action. If the current instruction makes a request and has a further meaning in semantics, it can be judged as Identify_Modify.
+
+**Attention**
+In order to make the information more condensed and focused while saving context length, the conversation history in example may not the original conversation history, but a summarized conversation history. When identifying actions, pay attention to the semantic associations between dialogues and do not be misled by the fact that the information is summarized rather than the original text.
+Let's begin.
+
+Dialogue History:
+{conv_history}
+
+Instruction:
+{user_instruction}
+
+Intention:
+{intention}
+
+Please make sure that the answer generated is one of Identify_Global_Constraint \ Identify_Context-Anchored \ Identify_Modify \ Identify_Summary \ Done and do not generate irrelevant answers.
